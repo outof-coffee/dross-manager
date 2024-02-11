@@ -37,17 +37,14 @@ async fn axum(
     let db = Builder::new_remote(turso_addr, turso_token).build().await.unwrap();
 
     let turso = db.connect().unwrap();
-    //
-    // turso.execute_batch("DROP TABLE IF EXISTS faeries").await.unwrap();
 
 
+    turso.execute_batch("DROP TABLE IF EXISTS faeries").await.unwrap();
     turso.execute_batch(
         faery::Faery::generate_sql_create_table().as_str()
     ).await.unwrap();
-
-    // let test_faery = faery::Faery::new_admin("NightWater".to_string(), "tsal@arikel.net".to_string());
-
-    // turso.execute(test_faery.to_sql_insert().as_str(), ()).await.unwrap();
+    let test_faery = faery::Faery::new_admin("NightWater".to_string(), "tsal@arikel.net".to_string());
+    turso.execute(test_faery.to_sql_insert().as_str(), ()).await.unwrap();
 
     let db = Arc::new(Mutex::new(turso));
     let state = Arc::new(DrossManagerState {

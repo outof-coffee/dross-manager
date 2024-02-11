@@ -72,7 +72,7 @@ impl Faery {
 impl SqlModel for Faery {
     fn to_sql_insert(&self) -> String {
         format!(
-            "INSERT INTO faeries (name, is_admin, email, dross) VALUES ('{}', '{}', '{}', {})",
+            "INSERT INTO faeries (name, is_admin, email, dross) VALUES ('{}', {}, '{}', {})",
             self.name,
             self.is_admin,
             self.email,
@@ -82,7 +82,7 @@ impl SqlModel for Faery {
 
     fn generate_sql_create_table() -> String {
         "CREATE TABLE IF NOT EXISTS faeries (
-            id SERIAL PRIMARY KEY,
+            id INTEGER PRIMARY KEY,
             name VARCHAR(255) NOT NULL,
             is_admin BOOLEAN NOT NULL,
             email VARCHAR(255) NOT NULL,
