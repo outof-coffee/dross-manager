@@ -8,7 +8,7 @@ use crate::faery::Faery;
 
 pub async fn list_faeries(State(state): State<Arc<DrossManagerState>>) -> Response {
 
-    println!("Listing faeries");
+    // println!("Listing faeries");
     let mut res = state.db
         .lock().await
         .query("SELECT * FROM faeries", ())
@@ -17,7 +17,7 @@ pub async fn list_faeries(State(state): State<Arc<DrossManagerState>>) -> Respon
     let mut faeries: Vec<Faery> = Vec::new();
 
     while let Some(row) = res.next().await.unwrap() {
-        println!("{:?}", row);
+        // println!("{:?}", row);
             let faery = Faery {
                 name: row.get(1).unwrap(),
                 is_admin: row.get(2).unwrap(),
