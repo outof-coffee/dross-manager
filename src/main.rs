@@ -6,19 +6,17 @@ mod endpoints;
 use std::net::SocketAddr;
 use axum::{routing::get, Router};
 use tower_http::services::ServeDir;
-// use libsql_client::client::Client;
-use libsql::{Database, Connection};
-use libsql::Builder;
+use libsql::{Builder, Connection};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use sql::SqlModel;
 
 pub struct DrossManagerService {
-    db: Arc<Mutex<Database>>,
+    db: Arc<Mutex<Connection>>,
     router: Router
 }
 pub struct DrossManagerState {
-    pub db: Arc<Mutex<Database>>,
+    pub db: Arc<Mutex<Connection>>,
 }
 
 async fn hello_world() -> &'static str {
@@ -28,22 +26,32 @@ async fn hello_world() -> &'static str {
 #[shuttle_runtime::main]
 async fn axum(
     #[shuttle_secrets::Secrets] store: shuttle_secrets::SecretStore,
+    // #[shuttle_turso::Turso(
+    //     addr = "",
+    //     token = ""
+    // )] turso: Connection
 ) -> Result<DrossManagerService, shuttle_runtime::Error> {
 
     let turso_addr = store.get("TURSO_URL").unwrap();
     let turso_token = store.get("TURSO_TOKEN").unwrap();
     let db = Builder::new_remote(turso_addr, turso_token).build().await.unwrap();
 
-    db.connect().unwrap().execute_batch(
+    let turso = db.connect().unwrap();
+    //
+    // turso.execute_batch("DROP TABLE IF EXISTS faeries").await.unwrap();
+
+    turso.execute_batch(
         faery::Faery::generate_sql_create_table().as_str()
     ).await.unwrap();
 
-    let db = Arc::new(Mutex::new(db));
+    let db = Arc::new(Mutex::new(turso));
     let state = Arc::new(DrossManagerState {
         db: db.clone()
     });
 
-    let router = Router::new().route("/hello", get(hello_world))
+    let router = Router::new()
+        .route("/hello", get(hello_world))
+        .route("/faeries", get(endpoints::list_faeries))
         .with_state(state)
         .nest_service("/", ServeDir::new("public_html"));
 

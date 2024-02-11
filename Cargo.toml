@@ -15,3 +15,4 @@ shuttle-secrets = "0.38.0"
 shuttle-turso = "0.38.0"
 tower-http = { version = "0.5.1", features = ["fs"] }
 tokio = "1.36.0"
+futures = "0.3.30"

@@ -6,11 +6,11 @@ use crate::sql::SqlModel;
 // It has the name of the user, their email, an authentication token, and a count of their dross.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Faery {
-    name: String,
-    email: String,
-    is_admin: bool,
-    auth_token: Option<String>,
-    dross: u32,
+    pub name: String,
+    pub email: String,
+    pub is_admin: bool,
+    pub auth_token: Option<String>,
+    pub dross: u32,
 }
 
 impl Faery {
@@ -72,8 +72,9 @@ impl Faery {
 impl SqlModel for Faery {
     fn to_sql_insert(&self) -> String {
         format!(
-            "INSERT INTO faeries (name, email, dross) VALUES ('{}', '{}', {})",
+            "INSERT INTO faeries (name, is_admin, email, dross) VALUES ('{}', '{}', '{}', {})",
             self.name,
+            self.is_admin,
             self.email,
             self.dross
         )
@@ -83,6 +84,7 @@ impl SqlModel for Faery {
         "CREATE TABLE IF NOT EXISTS faeries (
             id SERIAL PRIMARY KEY,
             name VARCHAR(255) NOT NULL,
+            is_admin BOOLEAN NOT NULL,
             email VARCHAR(255) NOT NULL,
             dross INTEGER
         )".to_string()
