@@ -45,7 +45,7 @@ async fn axum(
         faery::Faery::generate_sql_create_table().as_str()
     ).await.unwrap();
 
-    let test_faery = faery::Faery::new_admin("NightWater".to_string(), "tsal@arikel.net".to_string());
+    // let test_faery = faery::Faery::new_admin("NightWater".to_string(), "tsal@arikel.net".to_string());
 
     // turso.execute(test_faery.to_sql_insert().as_str(), ()).await.unwrap();
 
