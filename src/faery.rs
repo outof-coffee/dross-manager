@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use libsql::{Connection, Row, params};
+use libsql::{Row, params, Database};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use crate::dross::{DrossError, DrossHolder, DrossResult};
@@ -7,11 +7,11 @@ use crate::repository::{Repository, RepositoryError, RepositoryResult};
 
 #[derive(Clone)]
 pub struct FaeryRepository {
-    db: Arc<Mutex<Connection>>,
+    db: Arc<Mutex<Database>>,
 }
 
 impl FaeryRepository {
-    pub fn new(db: Arc<Mutex<Connection>>) -> FaeryRepository {
+    pub fn new(db: Arc<Mutex<Database>>) -> FaeryRepository {
         FaeryRepository {
             db,
         }
@@ -33,7 +33,7 @@ impl Repository for FaeryRepository {
     }
 
     async fn save(&self, faery: Faery) -> RepositoryResult<()> {
-        let db = self.db.lock().await;
+        let db = self.db.lock().await.connect().unwrap();
         let result = match faery.id {
             Some(id) => {
                 let mut stmt = db.prepare("UPDATE faeries SET name = ?1, is_admin = ?2, email = ?3, dross = ?4 WHERE id = ?5").await.unwrap();
@@ -51,7 +51,7 @@ impl Repository for FaeryRepository {
     }
 
     async fn create_table(&self) -> RepositoryResult<()> {
-        let db = self.db.lock().await;
+        let db = self.db.lock().await.connect().unwrap();
         let result = db.execute(
             r#"CREATE TABLE IF NOT EXISTS faeries (
     id INTEGER PRIMARY KEY,
@@ -67,7 +67,7 @@ impl Repository for FaeryRepository {
     }
 
     async fn drop_table(&self) -> RepositoryResult<()> {
-        let db = self.db.lock().await;
+        let db = self.db.lock().await.connect().unwrap();
         let result = db.execute("DROP TABLE IF EXISTS faeries", ()).await;
         match result {
             Ok(_) => Ok(()),
@@ -77,7 +77,7 @@ impl Repository for FaeryRepository {
 
     // Mark: Faery
     async fn get(&self, id: u32) -> RepositoryResult<Faery> {
-        let db = self.db.lock().await;
+        let db = self.db.lock().await.connect().unwrap();
         let mut stmt = db
             .prepare("SELECT * FROM faeries WHERE id = ?1")
             .await
@@ -94,7 +94,7 @@ impl Repository for FaeryRepository {
 
     async fn get_all(&self) -> RepositoryResult<Vec<Faery>> {
         log::trace!("locking db");
-        let db = self.db.lock().await;
+        let db = self.db.lock().await.connect().unwrap();
         log::trace!("locked db; querying all faeries");
         let result = db.query("SELECT * FROM faeries", ()).await;
         log::trace!("queried all faeries; checking result");

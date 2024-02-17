@@ -41,9 +41,9 @@ async fn axum(
     let turso_token = store.get("TURSO_TOKEN").unwrap();
     let db = Builder::new_remote(turso_addr, turso_token).build().await.unwrap();
 
-    let turso = db.connect().unwrap();
+    // let turso = db.connect().unwrap();
 
-    let db = Arc::new(Mutex::new(turso));
+    let db = Arc::new(Mutex::new(db));
     let state = Arc::new(DrossManagerState {
         faery_repository: Arc::new(faery::FaeryRepository::new(db.clone())),
     });
