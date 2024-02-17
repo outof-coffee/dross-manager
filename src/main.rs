@@ -1,5 +1,3 @@
-#![feature(associated_type_defaults)]
-
 mod faery;
 mod sql;
 mod dross;
