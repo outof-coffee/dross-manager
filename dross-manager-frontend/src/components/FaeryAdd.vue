@@ -32,8 +32,8 @@
     </div>
 
     <div v-else>
-      <h4>You submitted successfully!</h4>
-      <button class="btn btn-success" @click="newFaery">Add</button>
+      <h4>{{ message }}</h4>
+      <button class="btn btn-success" @click="newFaery">Add Another</button>
     </div>
   </div>
 </template>
