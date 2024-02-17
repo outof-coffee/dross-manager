@@ -49,18 +49,21 @@ async fn axum(
 
     // TODO: Remove everything except create_table
     // state.faery_repository.drop_table().await.unwrap();
+    println!("Creating table");
     state.faery_repository.create_table().await.unwrap();
     // state.faery_repository.save(faery::Faery::new(
     //         "NightWater".to_string(), "example@arikel.net".to_string(), true, 0, None)
     //     )
     //     .await.unwrap();
 
+    println!("Creating CORS middleware");
     let cors = CorsLayer::new()
         // allow `GET` and `POST` when accessing the resource
         .allow_methods([Method::GET, Method::POST])
         // allow requests from any origin
         .allow_origin(Any);
 
+    println!("Creating router");
     let router = Router::new()
         .route("/hello", get(hello_world))
         .route("/faeries", get(endpoints::list_faeries))
