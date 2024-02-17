@@ -1,34 +1,10 @@
 use std::sync::Arc;
-use libsql::{Connection, Row};
+use libsql::{Connection, Row, params};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use crate::dross::{DrossError, DrossHolder, DrossResult};
-use libsql::params;
+use crate::repository::{Repository, RepositoryError, RepositoryResult};
 
-// TODO: move
-#[allow(dead_code)]
-#[derive(Debug, Serialize)]
-pub enum RepositoryError {
-    NotFound,
-    AlreadyExists,
-    Other,
-}
-pub type RepositoryResult = Result<(), RepositoryError>;
-pub type FaeryResult = Result<Faery, RepositoryError>;
-// TODO: fix this
-pub type FaeriesResult = Result<Vec<Faery>, RepositoryError>;
-
-// TODO: fix this
-#[shuttle_runtime::async_trait]
-pub trait Repository: Sized {
-    async fn create(&self, faery: Option<Faery>) -> RepositoryResult;
-    async fn save(&self, faery: Faery) -> RepositoryResult;
-    async fn create_table(&self) -> RepositoryResult;
-    async fn drop_table(&self) -> RepositoryResult;
-    async fn get(&self, id: u32) -> FaeryResult;
-    async fn get_all(&self) -> FaeriesResult;
-    fn table_name() -> String where Self: Sized;
-}
 #[derive(Clone)]
 pub struct FaeryRepository {
     db: Arc<Mutex<Connection>>,
@@ -43,9 +19,11 @@ impl FaeryRepository {
 }
 
 #[shuttle_runtime::async_trait]
+// Mark: Repository
 impl Repository for FaeryRepository {
-    // Mark: Repository
-    async fn create(&self, faery: Option<Faery>) -> RepositoryResult {
+    type Item = Faery;
+
+    async fn create(&self, faery: Option<Faery>) -> RepositoryResult<()> {
         match faery {
             Some(faery) => {
                 self.save(faery).await
@@ -54,18 +32,28 @@ impl Repository for FaeryRepository {
         }
     }
 
-    async fn save(&self, faery: Faery) -> RepositoryResult {
+    async fn save(&self, faery: Faery) -> RepositoryResult<()> {
         // TODO: implement upsert
         let db = self.db.lock().await;
-        let mut stmt = db.prepare("INSERT INTO faeries (name, is_admin, email, dross) VALUES (?1, ?2, ?3, ?4)").await.unwrap();
-        let result = stmt.query(params![faery.name, faery.is_admin, faery.email, faery.dross]).await;
+        let result = match faery.id {
+            Some(id) => {
+                let mut stmt = db.prepare("UPDATE faeries SET name = ?1, is_admin = ?2, email = ?3, dross = ?4 WHERE id = ?5").await.unwrap();
+                stmt.query(params![faery.name, faery.is_admin, faery.email, faery.dross, id]).await
+            },
+            None => {
+                let mut stmt = db.prepare("INSERT INTO faeries (name, is_admin, email, dross) VALUES (?1, ?2, ?3, ?4)").await.unwrap();
+                stmt.query(params![faery.name, faery.is_admin, faery.email, faery.dross]).await
+            },
+        };
+        // let mut stmt = db.prepare("INSERT INTO faeries (name, is_admin, email, dross) VALUES (?1, ?2, ?3, ?4)").await.unwrap();
+        // let result = stmt.query(params![faery.name, faery.is_admin, faery.email, faery.dross]).await;
         match result {
             Ok(_) => Ok(()),
             Err(_) => Err(RepositoryError::Other),
         }
     }
 
-    async fn create_table(&self) -> RepositoryResult {
+    async fn create_table(&self) -> RepositoryResult<()> {
         let db = self.db.lock().await;
         let result = db.execute(
             r#"CREATE TABLE IF NOT EXISTS faeries (
@@ -81,7 +69,7 @@ impl Repository for FaeryRepository {
         }
     }
 
-    async fn drop_table(&self) -> RepositoryResult {
+    async fn drop_table(&self) -> RepositoryResult<()> {
         let db = self.db.lock().await;
         let result = db.execute("DROP TABLE IF EXISTS faeries", ()).await;
         match result {
@@ -91,7 +79,7 @@ impl Repository for FaeryRepository {
     }
 
     // Mark: Faery
-    async fn get(&self, id: u32) -> FaeryResult {
+    async fn get(&self, id: u32) -> RepositoryResult<Faery> {
         let db = self.db.lock().await;
         let mut stmt = db
             .prepare("SELECT * FROM faeries WHERE id = ?1")
@@ -107,7 +95,7 @@ impl Repository for FaeryRepository {
         }
     }
 
-    async fn get_all(&self) -> FaeriesResult {
+    async fn get_all(&self) -> RepositoryResult<Vec<Faery>> {
         let db = self.db.lock().await;
         let mut res = db.query("SELECT * FROM faeries", ()).await.unwrap();
         let mut faeries: Vec<Faery> = Vec::new();

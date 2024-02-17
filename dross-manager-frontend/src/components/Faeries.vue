@@ -1,30 +1,29 @@
 <script setup>
+import Faery from "./Faery.vue";
 </script>
 
 <template>
-  <div v-for="faery in faeries" :key="faery.id">
-    <h2>{{ faery.name }}</h2>
-    <p><a :href="'mailto:' + faery.email"><em>e-mail</em></a></p>
-    <p><em>dross:</em>{{ faery.dross }}</p>
-  </div></template>
+  <Faery v-for="faery in faeries" :key="faery.id" :faery="faery" />
+</template>
 
 <script>
-import axios from 'axios'
+import FaeryDataService from "../services/FaeryDataService.js";
 
 export default {
+  name: "faeries-list",
   data() {
     return {
       faeries: []
     }
   },
   mounted() {
-    axios.get('/faeries')
-        .then(response => {
-          this.faeries = response.data
-        })
-        .catch(error => {
-          console.log(error)
-        })
+    FaeryDataService.getAll()
+      .then(response => {
+        this.faeries = response.data;
+      })
+      .catch(e => {
+        console.log(e);
+      });
   }
 }
 </script>

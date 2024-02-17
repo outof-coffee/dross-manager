@@ -1,7 +1,10 @@
+#![feature(associated_type_defaults)]
+
 mod faery;
 mod sql;
 mod dross;
 mod endpoints;
+mod repository;
 
 use std::net::SocketAddr;
 use axum::{routing::get, Router};
@@ -9,7 +12,7 @@ use tower_http::services::ServeDir;
 use libsql::Builder;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use faery::Repository;
+use repository::Repository;
 use http::{Method};
 
 use tower::{ServiceBuilder};
@@ -49,21 +52,21 @@ async fn axum(
 
     // TODO: Remove everything except create_table
     // state.faery_repository.drop_table().await.unwrap();
-    println!("Creating table");
+    log::info!("Creating table");
     state.faery_repository.create_table().await.unwrap();
     // state.faery_repository.save(faery::Faery::new(
     //         "NightWater".to_string(), "example@arikel.net".to_string(), true, 0, None)
     //     )
     //     .await.unwrap();
 
-    println!("Creating CORS middleware");
+    log::info!("Creating CORS middleware");
     let cors = CorsLayer::new()
         // allow `GET` and `POST` when accessing the resource
         .allow_methods([Method::GET, Method::POST])
         // allow requests from any origin
         .allow_origin(Any);
 
-    println!("Creating router");
+    log::info!("Creating router");
     let router = Router::new()
         .route("/hello", get(hello_world))
         .route("/faeries", get(endpoints::list_faeries))
