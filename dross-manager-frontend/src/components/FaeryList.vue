@@ -47,7 +47,7 @@ import FaeryDetail from "./FaeryDetail.vue";
 import FaeryDataService from "../services/FaeryDataService.js";
 
 export default {
-  name: "faeries-list",
+  name: "faeries",
   data() {
     return {
       faeries: [],

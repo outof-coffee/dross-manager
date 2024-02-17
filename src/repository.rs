@@ -1,3 +1,4 @@
+use axum::extract::rejection::JsonRejection;
 use serde::Serialize;
 
 // TODO: move
@@ -6,6 +7,7 @@ use serde::Serialize;
 pub enum RepositoryError {
     NotFound,
     AlreadyExists,
+    InvalidModel,
     Other,
 }
 
@@ -21,4 +23,14 @@ pub trait Repository: Sized + Send + Sync {
     async fn get(&self, id: u32) -> RepositoryResult<Self::Item>;
     async fn get_all(&self) -> RepositoryResult<Vec<Self::Item>>;
     fn table_name() -> String where Self: Sized;
+}
+
+impl From<JsonRejection> for RepositoryError {
+    fn from(err: JsonRejection) -> Self {
+        match err {
+            JsonRejection::JsonDataError(_) => RepositoryError::InvalidModel,
+            JsonRejection::JsonSyntaxError(_) => RepositoryError::InvalidModel,
+            _ => RepositoryError::Other
+        }
+    }
 }

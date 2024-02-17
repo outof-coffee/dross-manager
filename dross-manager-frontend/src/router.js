@@ -9,7 +9,7 @@ const routes =  [
     },
     {
         path: "/faeries/:id",
-        name: "faery-details",
+        name: "faery-edit",
         component: () => import("./components/FaeryEdit.vue")
     },
     // {

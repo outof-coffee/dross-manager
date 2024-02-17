@@ -21,19 +21,26 @@
 
       <div class="form-group">
         <label for="dross"><strong>Dross:</strong></label>
-        <input type="text" class="form-control" id="dross"
-               v-model="currentFaery.dross"
+        <input type="number" class="form-control" id="dross"
+               v-model.number="currentFaery.dross"
                />
+      </div>
+
+      <div class="form-group">
+        <input type="checkbox" class="form-check-inline" id="is-admin"
+               v-model="currentFaery.is_admin"
+        />
+        <label for="is-admin"><strong>Is Admin</strong></label>
       </div>
     </form>
 
-    <button class="badge badge-danger mr-2"
+    <button class="btn btn-danger mr-2"
             @click="deleteFaery"
     >
       Delete
     </button>
 
-    <button type="submit" class="badge badge-success"
+    <button type="submit" class="btn btn-info"
             @click="updateFaery"
     >
       Update

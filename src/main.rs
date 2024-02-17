@@ -1,5 +1,4 @@
 mod faery;
-mod sql;
 mod dross;
 mod endpoints;
 mod repository;
@@ -9,6 +8,7 @@ use axum::{routing::get, Router};
 use tower_http::services::ServeDir;
 use libsql::Builder;
 use std::sync::Arc;
+use axum::routing::post;
 use tokio::sync::Mutex;
 use repository::Repository;
 use http::{Method};
@@ -61,8 +61,8 @@ async fn axum(
     log::info!("Creating router");
     let router = Router::new()
         .route("/api/hello", get(hello_world))
-        .route("/api/faeries", get(endpoints::list_faeries))
-        .route("/api/faeries/:faery_id", get(endpoints::get_faery))
+        .route("/api/faeries", get(endpoints::list_faeries).post(endpoints::create_faery))
+        .route("/api/faeries/:faery_id", get(endpoints::get_faery).put(endpoints::update_faery))
         .layer(ServiceBuilder::new().layer(cors))
         .with_state(state)
         .nest_service("/", ServeDir::new("dross-manager-frontend/dist"));

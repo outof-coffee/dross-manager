@@ -12,7 +12,7 @@ const props = defineProps({
   <h2>{{ faery.name }}</h2>
   <p><a :href="'mailto:' + faery.email"><em>e-mail</em></a></p>
   <p><em>dross:</em>{{ faery.dross }}</p>
-  <router-link :to="'/faeries/' + faery.id" class="badge badge-warning">Edit</router-link>
+  <router-link :to="'/faeries/' + faery.id" class="btn btn-primary">Edit</router-link>
 </div>
 </template>
 
