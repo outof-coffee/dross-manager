@@ -12,8 +12,8 @@ pub enum RepositoryError {
 pub type RepositoryResult<T> = Result<T, RepositoryError>;
 
 #[shuttle_runtime::async_trait]
-pub trait Repository: Sized {
-    type Item;
+pub trait Repository: Sized + Send + Sync {
+    type Item: Serialize + Sized + Send + Sync;
     async fn create(&self, template_item: Option<Self::Item>) -> RepositoryResult<()>;
     async fn save(&self, item: Self::Item) -> RepositoryResult<()>;
     async fn create_table(&self) -> RepositoryResult<()>;

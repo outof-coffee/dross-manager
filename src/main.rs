@@ -31,6 +31,7 @@ async fn hello_world() -> &'static str {
 #[shuttle_runtime::main]
 async fn axum(
     #[shuttle_secrets::Secrets] store: shuttle_secrets::SecretStore,
+    // TODO: Remove entirely or replace with a real connection once shuttle_turso is fixed
     // #[shuttle_turso::Turso(
     //     addr = "",
     //     token = ""
@@ -46,7 +47,7 @@ async fn axum(
         faery_repository: Arc::new(faery::FaeryRepository::new(db.clone())),
     });
 
-    // TODO: Remove everything except create_table
+    // TODO: Handle errors
     log::info!("Creating table");
     state.faery_repository.create_table().await.unwrap();
 
@@ -59,9 +60,9 @@ async fn axum(
 
     log::info!("Creating router");
     let router = Router::new()
-        .route("/hello", get(hello_world))
-        .route("/faeries", get(endpoints::list_faeries))
-        .route("/faeries/:faery_id", get(endpoints::get_faery))
+        .route("/api/hello", get(hello_world))
+        .route("/api/faeries", get(endpoints::list_faeries))
+        .route("/api/faeries/:faery_id", get(endpoints::get_faery))
         .layer(ServiceBuilder::new().layer(cors))
         .with_state(state)
         .nest_service("/", ServeDir::new("dross-manager-frontend/dist"));
