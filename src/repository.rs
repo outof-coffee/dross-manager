@@ -22,6 +22,7 @@ pub trait Repository: Sized + Send + Sync {
     async fn drop_table(&self) -> RepositoryResult<()>;
     async fn get(&self, id: u32) -> RepositoryResult<Self::Item>;
     async fn get_all(&self) -> RepositoryResult<Vec<Self::Item>>;
+    async fn delete(&self, id: u32) -> RepositoryResult<()>;
     fn table_name() -> String where Self: Sized;
 }
 

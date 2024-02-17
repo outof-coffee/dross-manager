@@ -105,3 +105,16 @@ pub async fn create_faery(
     }
 
 }
+
+pub async fn delete_faery(State(state): State<Arc<DrossManagerState>>, Path(faery_id): Path<u32>) -> Response {
+    log::info!("Deleting faery {}", faery_id);
+    match state.clone().faery_repository.delete(faery_id).await {
+        Ok(_) => {
+            (StatusCode::NO_CONTENT, Json("")).into_response()
+        },
+        Err(err) => {
+            log::error!("Error deleting faery {}: {:?}", faery_id, err);
+            (StatusCode::NOT_FOUND, Json(err)).into_response()
+        }
+    }
+}

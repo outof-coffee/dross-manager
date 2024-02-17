@@ -114,6 +114,15 @@ impl Repository for FaeryRepository {
         Ok(faeries)
     }
 
+    async fn delete(&self, id: u32) -> RepositoryResult<()> {
+        let db = self.db.lock().await.connect().unwrap();
+        let result = db.execute("DELETE FROM faeries WHERE id = ?1", [id]).await;
+        match result {
+            Ok(_) => Ok(()),
+            Err(_) => Err(RepositoryError::NotFound),
+        }
+    }
+
     fn table_name() -> String {
         "faeries".to_string()
     }

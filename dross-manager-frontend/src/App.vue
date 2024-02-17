@@ -5,7 +5,7 @@
 <template>
   <div id="app">
     <nav class="navbar navbar-expand navbar-dark bg-dark">
-      <router-link to="/" class="navbar-brand">dross manager</router-link>
+      <router-link to="/" class="navbar-brand">Fe Vault</router-link>
       <div class="navbar-nav mr-auto">
         <li class="nav-item">
           <router-link to="/faeries" class="nav-link">Faeries List</router-link>

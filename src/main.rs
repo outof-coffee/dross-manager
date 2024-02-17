@@ -61,7 +61,7 @@ async fn axum(
     let router = Router::new()
         .route("/api/hello", get(hello_world))
         .route("/api/faeries", get(endpoints::list_faeries).post(endpoints::create_faery))
-        .route("/api/faeries/:faery_id", get(endpoints::get_faery).put(endpoints::update_faery))
+        .route("/api/faeries/:faery_id", get(endpoints::get_faery).put(endpoints::update_faery).delete(endpoints::delete_faery))
         .layer(ServiceBuilder::new().layer(cors))
         .with_state(state)
         .nest_service("/", ServeDir::new("dross-manager-frontend/dist"));
