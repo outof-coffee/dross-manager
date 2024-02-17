@@ -33,7 +33,6 @@ impl Repository for FaeryRepository {
     }
 
     async fn save(&self, faery: Faery) -> RepositoryResult<()> {
-        // TODO: implement upsert
         let db = self.db.lock().await;
         let result = match faery.id {
             Some(id) => {
@@ -45,8 +44,6 @@ impl Repository for FaeryRepository {
                 stmt.query(params![faery.name, faery.is_admin, faery.email, faery.dross]).await
             },
         };
-        // let mut stmt = db.prepare("INSERT INTO faeries (name, is_admin, email, dross) VALUES (?1, ?2, ?3, ?4)").await.unwrap();
-        // let result = stmt.query(params![faery.name, faery.is_admin, faery.email, faery.dross]).await;
         match result {
             Ok(_) => Ok(()),
             Err(_) => Err(RepositoryError::Other),
@@ -96,11 +93,27 @@ impl Repository for FaeryRepository {
     }
 
     async fn get_all(&self) -> RepositoryResult<Vec<Faery>> {
+        log::trace!("locking db");
         let db = self.db.lock().await;
-        let mut res = db.query("SELECT * FROM faeries", ()).await.unwrap();
+        log::trace!("locked db; querying all faeries");
+        let result = db.query("SELECT * FROM faeries", ()).await;
+        log::trace!("queried all faeries; checking result");
+        let mut res = match result {
+            Ok(res) => res,
+            Err(err) => {
+                log::error!("Error getting all faeries: {:?}", err);
+                return Err(RepositoryError::Other)
+            },
+        };
         let mut faeries: Vec<Faery> = Vec::new();
-        while let Some(row) = res.next().await.unwrap() {
-            faeries.push(Faery::from_response(&row));
+        log::trace!("iterating over results");
+        while let Ok(result_row) = res.next().await {
+            match result_row {
+                Some(row) => {
+                    faeries.push(Faery::from_response(&row));
+                },
+                None => break,
+            }
         }
         Ok(faeries)
     }
