@@ -2,3 +2,5 @@
 Cargo.lock
 Secrets.toml
 .idea
+dross-manager-frontend/.vscode/
+.vscode/*

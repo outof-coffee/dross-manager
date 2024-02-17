@@ -9,10 +9,10 @@ edition = "2021"
 axum = { version = "0.7.4", features = ["http2"] }
 libsql = { git = "https://github.com/tursodatabase/libsql" }
 serde = { version = "1.0.196", features = ["derive"] }
-shuttle-axum = { version = "0.38.0", default-features = false, features = ["axum-0-6"]}
-shuttle-runtime = "0.38.0"
-shuttle-secrets = "0.38.0"
-shuttle-turso = "0.38.0"
+shuttle-axum = { version = "0.39.0" }
+shuttle-runtime = "0.39.0"
+shuttle-secrets = "0.39.0"
+shuttle-turso = "0.39.0"
 tower-http = { version = "0.5.1", features = ["fs", "cors"] }
 tokio = "1.36.0"
 futures = "0.3.30"
