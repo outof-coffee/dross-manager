@@ -18,7 +18,7 @@ export default {
     }
   },
   mounted() {
-    axios.get('http://localhost:8000/faeries')
+    axios.get('https://dross-manager.shuttleapp.rs/faeries')
         .then(response => {
           this.faeries = response.data
         })
