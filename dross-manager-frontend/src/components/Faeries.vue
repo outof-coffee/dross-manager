@@ -5,7 +5,7 @@
   <div v-for="faery in faeries" :key="faery.id">
     <h2>{{ faery.name }}</h2>
     <p><a :href="'mailto:' + faery.email"><em>e-mail</em></a></p>
-    <p>{{ faery.dross }}</p>
+    <p><em>dross:</em>{{ faery.dross }}</p>
   </div></template>
 
 <script>
