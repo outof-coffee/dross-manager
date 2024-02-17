@@ -10,11 +10,11 @@ use libsql::Builder;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use faery::Repository;
-use http::{Request, Response, Method, header};
-use bytes::Bytes;
-use tower::{ServiceBuilder, ServiceExt, Service};
+use http::{Method};
+
+use tower::{ServiceBuilder};
 use tower_http::cors::{Any, CorsLayer};
-use std::convert::Infallible;
+
 
 pub struct DrossManagerService {
     router: Router

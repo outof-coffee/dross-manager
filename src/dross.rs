@@ -2,6 +2,7 @@ use crate::faery::Faery;
 
 // transfer_dross takes a sender and a receiver and an amount of dross to transfer.
 // It returns a Result that is Ok(()) if the transfer was successful and Err(()) if it was not.
+#[allow(dead_code)]
 pub fn transfer_dross(sender: &mut Faery, receiver: &mut Faery, amount: u32) -> DrossResult {
     match sender.decrement_dross(amount) {
         Ok(_) => {
@@ -21,9 +22,10 @@ pub trait DrossHolder {
 
 pub type DrossResult = Result<u32, DrossError>;
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum DrossError {
-    NegativeDross,
+    // NegativeDross,
     NotEnoughDross,
     InvalidIncrement,
     InvalidDecrement,

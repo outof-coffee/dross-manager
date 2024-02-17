@@ -6,6 +6,7 @@ use crate::dross::{DrossError, DrossHolder, DrossResult};
 use libsql::params;
 
 // TODO: move
+#[allow(dead_code)]
 #[derive(Debug, Serialize)]
 pub enum RepositoryError {
     NotFound,
@@ -55,7 +56,7 @@ impl Repository for FaeryRepository {
 
     async fn save(&self, faery: Faery) -> RepositoryResult {
         // TODO: implement upsert
-        let mut db = self.db.lock().await;
+        let db = self.db.lock().await;
         let mut stmt = db.prepare("INSERT INTO faeries (name, is_admin, email, dross) VALUES (?1, ?2, ?3, ?4)").await.unwrap();
         let result = stmt.query(params![faery.name, faery.is_admin, faery.email, faery.dross]).await;
         match result {
@@ -65,7 +66,7 @@ impl Repository for FaeryRepository {
     }
 
     async fn create_table(&self) -> RepositoryResult {
-        let mut db = self.db.lock().await;
+        let db = self.db.lock().await;
         let result = db.execute(
             r#"CREATE TABLE IF NOT EXISTS faeries (
     id INTEGER PRIMARY KEY,
@@ -81,7 +82,7 @@ impl Repository for FaeryRepository {
     }
 
     async fn drop_table(&self) -> RepositoryResult {
-        let mut db = self.db.lock().await;
+        let db = self.db.lock().await;
         let result = db.execute("DROP TABLE IF EXISTS faeries", ()).await;
         match result {
             Ok(_) => Ok(()),
@@ -91,7 +92,7 @@ impl Repository for FaeryRepository {
 
     // Mark: Faery
     async fn get(&self, id: u32) -> FaeryResult {
-        let mut db = self.db.lock().await;
+        let db = self.db.lock().await;
         let mut stmt = db
             .prepare("SELECT * FROM faeries WHERE id = ?1")
             .await
@@ -107,7 +108,7 @@ impl Repository for FaeryRepository {
     }
 
     async fn get_all(&self) -> FaeriesResult {
-        let mut db = self.db.lock().await;
+        let db = self.db.lock().await;
         let mut res = db.query("SELECT * FROM faeries", ()).await.unwrap();
         let mut faeries: Vec<Faery> = Vec::new();
         while let Some(row) = res.next().await.unwrap() {
@@ -135,6 +136,7 @@ pub struct Faery {
     pub dross: u32,
 }
 
+#[allow(dead_code)]
 impl Faery {
     // This is a method that creates a new Faery.
     // It takes a name and an email and returns a Faery.
