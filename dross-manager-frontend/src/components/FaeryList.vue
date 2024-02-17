@@ -34,7 +34,6 @@ import FaeryDetail from "./FaeryDetail.vue";
     <div class="col-md-6">
       <div v-if="currentFaery">
         <FaeryDetail :faery="currentFaery" />
-        <router-link :to="'/faeries/' + currentFaery.id" class="badge badge-warning">Edit</router-link>
       </div>
       <div v-else>
         <br />

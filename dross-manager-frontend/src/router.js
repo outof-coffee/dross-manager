@@ -10,7 +10,7 @@ const routes =  [
     {
         path: "/faeries/:id",
         name: "faery-details",
-        component: () => import("./components/FaeryDetail.vue")
+        component: () => import("./components/FaeryEdit.vue")
     },
     // {
     //     path: "/add",
