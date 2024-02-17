@@ -13,6 +13,9 @@ shuttle-axum = { version = "0.38.0", default-features = false, features = ["axum
 shuttle-runtime = "0.38.0"
 shuttle-secrets = "0.38.0"
 shuttle-turso = "0.38.0"
-tower-http = { version = "0.5.1", features = ["fs"] }
+tower-http = { version = "0.5.1", features = ["fs", "cors"] }
 tokio = "1.36.0"
 futures = "0.3.30"
+http = "1.0.0"
+bytes = "1.5.0"
+tower = "0.4.13"

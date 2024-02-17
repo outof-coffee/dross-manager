@@ -6,17 +6,21 @@ mod endpoints;
 use std::net::SocketAddr;
 use axum::{routing::get, Router};
 use tower_http::services::ServeDir;
-use libsql::{Builder, Connection};
+use libsql::Builder;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use sql::SqlModel;
+use faery::Repository;
+use http::{Request, Response, Method, header};
+use bytes::Bytes;
+use tower::{ServiceBuilder, ServiceExt, Service};
+use tower_http::cors::{Any, CorsLayer};
+use std::convert::Infallible;
 
 pub struct DrossManagerService {
-    db: Arc<Mutex<Connection>>,
     router: Router
 }
 pub struct DrossManagerState {
-    pub db: Arc<Mutex<Connection>>,
+    pub faery_repository: Arc<faery::FaeryRepository>
 }
 
 async fn hello_world() -> &'static str {
@@ -38,27 +42,34 @@ async fn axum(
 
     let turso = db.connect().unwrap();
 
-
-    turso.execute_batch("DROP TABLE IF EXISTS faeries").await.unwrap();
-    turso.execute_batch(
-        faery::Faery::generate_sql_create_table().as_str()
-    ).await.unwrap();
-    let test_faery = faery::Faery::new_admin("NightWater".to_string(), "tsal@arikel.net".to_string());
-    turso.execute(test_faery.to_sql_insert().as_str(), ()).await.unwrap();
-
     let db = Arc::new(Mutex::new(turso));
     let state = Arc::new(DrossManagerState {
-        db: db.clone()
+        faery_repository: Arc::new(faery::FaeryRepository::new(db.clone())),
     });
+
+    // TODO: Remove everything except create_table
+    state.faery_repository.drop_table().await.unwrap();
+    state.faery_repository.create_table().await.unwrap();
+    state.faery_repository.save(faery::Faery::new(
+            "NightWater".to_string(), "example@arikel.net".to_string(), true, 0, None)
+        )
+        .await.unwrap();
+
+    let cors = CorsLayer::new()
+        // allow `GET` and `POST` when accessing the resource
+        .allow_methods([Method::GET, Method::POST])
+        // allow requests from any origin
+        .allow_origin(Any);
 
     let router = Router::new()
         .route("/hello", get(hello_world))
         .route("/faeries", get(endpoints::list_faeries))
+        .route("/faeries/:faery_id", get(endpoints::get_faery))
+        .layer(ServiceBuilder::new().layer(cors))
         .with_state(state)
-        .nest_service("/", ServeDir::new("public_html"));
+        .nest_service("/", ServeDir::new("dross-manager-frontend/dist"));
 
     Ok(DrossManagerService {
-        db,
         router
     })
 }
@@ -78,11 +89,11 @@ mod tests {
     use crate::faery::Faery;
 
     fn new_faery() -> Faery {
-        Faery::new("Tinkerbell".to_string(), "me@example.com".to_string())
+        Faery::new("Tinkerbell".to_string(), "me@example.com".to_string(), false, 0, None)
     }
 
     fn new_faery_two() -> Faery {
-        Faery::new("Silvermist".to_string(), "you@example.com".to_string())
+        Faery::new("Silvermist".to_string(), "you@example.com".to_string(), false, 0, None)
     }
 
     #[test]
