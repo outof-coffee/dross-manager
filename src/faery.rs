@@ -93,11 +93,8 @@ impl Repository for FaeryRepository {
     }
 
     async fn get_all(&self) -> RepositoryResult<Vec<Faery>> {
-        log::trace!("locking db");
         let db = self.db.lock().await.connect().unwrap();
-        log::trace!("locked db; querying all faeries");
         let result = db.query("SELECT * FROM faeries", ()).await;
-        log::trace!("queried all faeries; checking result");
         let mut res = match result {
             Ok(res) => res,
             Err(err) => {
@@ -106,7 +103,6 @@ impl Repository for FaeryRepository {
             },
         };
         let mut faeries: Vec<Faery> = Vec::new();
-        log::trace!("iterating over results");
         while let Ok(result_row) = res.next().await {
             match result_row {
                 Some(row) => {

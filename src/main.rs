@@ -41,21 +41,14 @@ async fn axum(
     let turso_token = store.get("TURSO_TOKEN").unwrap();
     let db = Builder::new_remote(turso_addr, turso_token).build().await.unwrap();
 
-    // let turso = db.connect().unwrap();
-
     let db = Arc::new(Mutex::new(db));
     let state = Arc::new(DrossManagerState {
         faery_repository: Arc::new(faery::FaeryRepository::new(db.clone())),
     });
 
     // TODO: Remove everything except create_table
-    // state.faery_repository.drop_table().await.unwrap();
     log::info!("Creating table");
     state.faery_repository.create_table().await.unwrap();
-    // state.faery_repository.save(faery::Faery::new(
-    //         "NightWater".to_string(), "example@arikel.net".to_string(), true, 0, None)
-    //     )
-    //     .await.unwrap();
 
     log::info!("Creating CORS middleware");
     let cors = CorsLayer::new()
