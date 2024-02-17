@@ -1,18 +1,21 @@
 <script setup>
-import Faeries from "@/components/Faeries.vue";
+// import Faeries from "@/components/FaeryList.vue";
 </script>
 
 <template>
-  <header>
-    <img alt="Vue logo" class="logo" src="./assets/logo.svg" width="125" height="125" />
-
-    <div class="wrapper">
-      <Faeries />
+  <div id="app">
+    <nav class="navbar navbar-expand navbar-dark bg-dark">
+      <router-link to="/" class="navbar-brand">dross manager</router-link>
+      <div class="navbar-nav mr-auto">
+        <li class="nav-item">
+          <router-link to="/faeries" class="nav-link">Faeries List</router-link>
+        </li>
+      </div>
+    </nav>
+    <div class="container mt-3">
+      <router-view />
     </div>
-  </header>
-
-  <main>
-  </main>
+  </div>
 </template>
 
 <style scoped>
