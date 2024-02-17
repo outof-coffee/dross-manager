@@ -48,12 +48,12 @@ async fn axum(
     });
 
     // TODO: Remove everything except create_table
-    state.faery_repository.drop_table().await.unwrap();
+    // state.faery_repository.drop_table().await.unwrap();
     state.faery_repository.create_table().await.unwrap();
-    state.faery_repository.save(faery::Faery::new(
-            "NightWater".to_string(), "example@arikel.net".to_string(), true, 0, None)
-        )
-        .await.unwrap();
+    // state.faery_repository.save(faery::Faery::new(
+    //         "NightWater".to_string(), "example@arikel.net".to_string(), true, 0, None)
+    //     )
+    //     .await.unwrap();
 
     let cors = CorsLayer::new()
         // allow `GET` and `POST` when accessing the resource
