@@ -18,7 +18,7 @@ export default {
     }
   },
   mounted() {
-    axios.get('https://dross-manager.shuttleapp.rs/faeries')
+    axios.get('/faeries')
         .then(response => {
           this.faeries = response.data
         })
