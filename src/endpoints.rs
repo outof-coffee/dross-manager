@@ -12,8 +12,8 @@ pub async fn list_faeries(State(state): State<Arc<DrossManagerState>>) -> Respon
         Ok(res) => {
             (StatusCode::OK, Json(res)).into_response()
         },
-        Err(_) => {
-            (StatusCode::INTERNAL_SERVER_ERROR, Json("Internal Server Error")).into_response()
+        Err(err) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(err)).into_response()
         }
     }
 }
