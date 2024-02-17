@@ -34,6 +34,7 @@
     <div v-else>
       <h4>{{ message }}</h4>
       <button class="btn btn-success" @click="newFaery">Add Another</button>
+      <router-link :to="'/faeries/' + faery.id" class="btn btn-info">Edit {{ faery.name }}</router-link>
     </div>
   </div>
 </template>
