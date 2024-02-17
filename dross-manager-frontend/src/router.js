@@ -12,11 +12,11 @@ const routes =  [
         name: "faery-edit",
         component: () => import("./components/FaeryEdit.vue")
     },
-    // {
-    //     path: "/add",
-    //     name: "add",
-    //     component: () => import("./components/AddTutorial")
-    // }
+    {
+        path: "/add",
+        name: "faery-add",
+        component: () => import("./components/FaeryAdd.vue")
+    }
 ];
 
 const router = createRouter({
