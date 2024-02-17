@@ -24,6 +24,10 @@ class FaeryDataService {
     deleteAll() {
         return http.delete(`/faeries`);
     }
+
+    // findByName(name) {
+    //     return http.get(`/faeries?name=${name}`);
+    // }
 }
 
 export default new FaeryDataService();

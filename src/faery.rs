@@ -114,6 +114,15 @@ impl Repository for FaeryRepository {
         Ok(faeries)
     }
 
+    async fn delete(&self, id: u32) -> RepositoryResult<()> {
+        let db = self.db.lock().await.connect().unwrap();
+        let result = db.execute("DELETE FROM faeries WHERE id = ?1", [id]).await;
+        match result {
+            Ok(_) => Ok(()),
+            Err(_) => Err(RepositoryError::NotFound),
+        }
+    }
+
     fn table_name() -> String {
         "faeries".to_string()
     }
@@ -126,7 +135,6 @@ pub struct Faery {
     pub(crate) id: Option<u32>,
     pub name: String,
     pub email: String,
-    #[serde(skip_serializing)]
     pub is_admin: bool,
     #[serde(skip_serializing)]
     pub auth_token: Option<String>,
@@ -186,6 +194,28 @@ impl Faery {
     // This is a method that sets the auth token of the Faery.
     pub fn set_auth_token(&mut self, auth_token: String) {
         self.auth_token = Some(auth_token);
+    }
+}
+
+impl Clone for Faery {
+    fn clone(&self) -> Self {
+        Faery {
+            id: self.id,
+            name: self.name.clone(),
+            email: self.email.clone(),
+            is_admin: self.is_admin,
+            auth_token: self.auth_token.clone(),
+            dross: self.dross,
+        }
+    }
+
+    fn clone_from(&mut self, source: &Self) {
+        self.id = source.id;
+        self.name = source.name.clone();
+        self.email = source.email.clone();
+        self.is_admin = source.is_admin;
+        self.auth_token = source.auth_token.clone();
+        self.dross = source.dross;
     }
 }
 
