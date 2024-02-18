@@ -2,6 +2,8 @@ mod faery;
 mod dross;
 mod endpoints;
 mod repository;
+mod migrations;
+mod version;
 
 use std::net::SocketAddr;
 use axum::{routing::get, Router};
@@ -9,11 +11,10 @@ use tower_http::services::ServeDir;
 use libsql::Builder;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use repository::Repository;
 use http::{Method};
 
 use tower::{ServiceBuilder};
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::{CorsLayer};
 
 
 pub struct DrossManagerService {
@@ -47,15 +48,16 @@ async fn axum(
     });
 
     // TODO: Handle errors
-    log::info!("Creating table");
-    state.faery_repository.create_table().await.unwrap();
+    let manager = migrations::Manager::new(db.clone(), state.faery_repository.clone());
+    let needs_migration = manager.needs_migration().await;
+    if needs_migration {
+        log::info!("Running migrations");
+        manager.migrate().await.unwrap();
+    }
 
     log::info!("Creating CORS middleware");
     let cors = CorsLayer::new()
-        // allow `GET` and `POST` when accessing the resource
-        .allow_methods([Method::GET, Method::POST])
-        // allow requests from any origin
-        .allow_origin(Any);
+        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE]);
 
     log::info!("Creating router");
     let router = Router::new()

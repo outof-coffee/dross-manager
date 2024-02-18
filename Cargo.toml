@@ -1,6 +1,6 @@
 [package]
 name = "dross-manager"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -20,3 +20,4 @@ http = "1.0.0"
 bytes = "1.5.0"
 tower = "0.4.13"
 log = "0.4.20"
+semver = "1.0.21"
