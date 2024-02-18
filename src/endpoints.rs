@@ -4,9 +4,8 @@ use axum::extract::rejection::JsonRejection;
 use axum::http::StatusCode;
 use axum::Json;
 use axum::response::{IntoResponse, Response};
-use serde::Deserialize;
 use crate::DrossManagerState;
-use crate::faery::Faery;
+use crate::faery::{CreateFaeryRequest, Faery};
 use crate::repository::{Repository, RepositoryError};
 
 pub async fn list_faeries(State(state): State<Arc<DrossManagerState>>) -> Response {
@@ -24,7 +23,7 @@ pub async fn list_faeries(State(state): State<Arc<DrossManagerState>>) -> Respon
     }
 }
 
-pub async fn get_faery(State(state): State<Arc<DrossManagerState>>, Path(faery_id): Path<u32>) -> Response {
+pub async fn get_faery(State(state): State<Arc<DrossManagerState>>, Path(faery_id): Path<i64>) -> Response {
     log::info!("Getting faery {}", faery_id);
     let res = state.clone().faery_repository.get(faery_id).await;
     match res {
@@ -48,7 +47,7 @@ pub async fn get_faery(State(state): State<Arc<DrossManagerState>>, Path(faery_i
 
 pub async fn update_faery(
     State(state): State<Arc<DrossManagerState>>,
-    Path(faery_id): Path<u32>,
+    Path(faery_id): Path<i64>,
     payload: Result<Json<Faery>, JsonRejection>
 ) -> Response {
     match payload {
@@ -70,16 +69,12 @@ pub async fn update_faery(
         },
         Err(err) => {
             log::error!("Error updating faery {}: {:?}", faery_id, err);
-            return (StatusCode::BAD_REQUEST, Json(RepositoryError::from(err))).into_response();
+            let repo_error: RepositoryError = err.into();
+            return (StatusCode::BAD_REQUEST, Json(repo_error)).into_response();
         }
     }
 }
 
-#[derive(Deserialize, Debug)]
-pub struct CreateFaeryRequest {
-    pub name: String,
-    pub email: String,
-}
 pub async fn create_faery(
     State(state): State<Arc<DrossManagerState>>,
     payload: Result<Json<CreateFaeryRequest>, JsonRejection>
@@ -87,7 +82,7 @@ pub async fn create_faery(
     match payload {
         Ok(Json(payload)) => {
             log::info!("Creating faery: {:?}", payload);
-            let faery = Faery::new(payload.name, payload.email, false, 0, None);
+            let faery: Faery = payload.into();
             match state.clone().faery_repository.create(Some(faery.clone())).await {
                 Ok(_) => {
                     (StatusCode::CREATED, Json(faery)).into_response()
@@ -100,13 +95,14 @@ pub async fn create_faery(
         },
         Err(err) => {
             log::error!("Error creating faery: {:?}", err);
-            return (StatusCode::BAD_REQUEST, Json(RepositoryError::from(err))).into_response();
+            let repo_error: RepositoryError = err.into();
+            return (StatusCode::BAD_REQUEST, Json(repo_error)).into_response();
         }
     }
 
 }
 
-pub async fn delete_faery(State(state): State<Arc<DrossManagerState>>, Path(faery_id): Path<u32>) -> Response {
+pub async fn delete_faery(State(state): State<Arc<DrossManagerState>>, Path(faery_id): Path<i64>) -> Response {
     log::info!("Deleting faery {}", faery_id);
     match state.clone().faery_repository.delete(faery_id).await {
         Ok(_) => {
