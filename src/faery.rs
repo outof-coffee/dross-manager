@@ -20,7 +20,7 @@ impl FaeryRepository {
     // TODO: Secure this method
     pub async fn update_auth_token(&self, id: i64, auth_token: String) -> RepositoryResult<()> {
         let db = self.db.lock().await.connect().unwrap();
-        let result = db.execute("UPDATE faeries SET auth_token = ?1 WHERE id = ?2", [auth_token, id]).await;
+        let result = db.execute("UPDATE faeries SET auth_token = ?1 WHERE id = ?2", params![auth_token, id]).await;
         match result {
             Ok(_) => Ok(()),
             Err(_) => Err(RepositoryError::Other),
