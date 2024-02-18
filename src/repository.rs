@@ -1,4 +1,5 @@
 use axum::extract::rejection::JsonRejection;
+use semver::Version;
 use serde::Serialize;
 
 // TODO: move
@@ -8,6 +9,7 @@ pub enum RepositoryError {
     NotFound,
     AlreadyExists,
     InvalidModel,
+    MigrationFailed(Version, Version),
     Other,
 }
 
