@@ -12,6 +12,31 @@ pub struct Migration {
     pub current_version: Option<Version>,
     pub target_version: Version,
 }
+
+impl From<Migration> for RepositoryError {
+    fn from(err: Migration) -> Self {
+        RepositoryError::MigrationFailed(
+            err.current_version.unwrap_or(Version::parse("0.0.0").unwrap()),
+            err.target_version,
+        )
+    }
+}
+
+impl Clone for Migration {
+    fn clone(&self) -> Self {
+        Migration {
+            current_version: self.current_version.clone(),
+            target_version: self.target_version.clone(),
+        }
+    }
+
+    fn clone_from(&mut self, source: &Self) {
+        self.current_version = source.current_version.clone();
+        self.target_version = source.target_version.clone();
+    }
+
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MigrationData {
     pub id: i64,
@@ -104,69 +129,130 @@ impl Manager {
         log::info!("Checking for migrations");
         let migration_data = self.get(0).await.unwrap_or_else(|_| Migration::new(None, None).into());
         log::info!("Migration data: {:?}", migration_data);
-        let current_migration: Migration = migration_data.into();
-        match current_migration.current_version {
+        match migration_data.current_version {
             Some(current_version) => {
                 let version_req = VersionReq::parse(
-                    &format!(">={}", current_migration.target_version.to_string())).unwrap();
-                !version_req.matches(&current_version)
+                    &format!(">={}", VERSION.to_string())).unwrap();
+                !version_req.matches(&Version::parse(&current_version).unwrap())
             },
-            None => true,
+            None => {
+                return true;
+            }
         }
     }
 
     pub async fn migrate(&self) -> RepositoryResult<()> {
-        // TODO: handle checking
-        log::info!("Migrating 0 to 0.2.1");
-        self.migrate_0_to_021().await
+        let current_state: Migration = self.get(0).await.unwrap_or_else(|_| Migration::new(None, None).into()).into();
+        log::info!("Migrating to {}", VERSION.to_string());
+        let current_migration: Migration = Migration::new(
+            current_state.current_version.map(|v| v.to_string()),
+            Some(VERSION.to_string())
+        );
+        self.update_migration_table(current_migration).await.unwrap();
+        match self.get(0).await {
+            Ok(migration_data) => {
+                match migration_data.target_version {
+                    Some(target) => {
+                        match target {
+                            version if version == "0.2.1" => {
+                                // Assumed to be 0 -> 0.2.1
+                                return self.migrate_0_to_021().await;
+                            },
+                            version if version == "0.2.2" => {
+                                if migration_data.current_version.is_none() {
+                                    self.migrate_0_to_021().await.unwrap();
+                                }
+                                return self.migrate_021_to_022().await;
+                            }
+                            version if version == "0.2.3" => {
+                                if migration_data.current_version.is_none() {
+                                    self.migrate_0_to_021().await.unwrap();
+                                }
+                                if migration_data.current_version == Some("0.2.1".to_string()) {
+                                    self.migrate_021_to_022().await.unwrap();
+                                }
+                                // return self.migrate_022_to_023().await;
+                            }
+                            _ => {
+                                log::info!("Unknown target version: {}", target);
+                            }
+                        }
+                    },
+                    None => {
+                        log::info!("No migration record found");
+                    }
+                }
+            },
+            Err(_) => {
+                log::info!("No migration record found");
+            }
+        }
+        Ok(())
+    }
+
+    async fn update_migration_table(&self, migration: Migration) -> RepositoryResult<()> {
+        let migration_data: MigrationData = migration.clone().into();
+        match self.save(migration_data).await {
+            Ok(_) => Ok(()),
+            Err(_) => Err(migration.into()),
+        }
+    }
+
+    async fn start_migration(&self, current_version: &str, target_version: &str) -> RepositoryResult<()> {
+        let migration = Migration::new(Some(current_version.to_string()), Some(target_version.to_string()));
+        self.update_migration_table(migration).await
+    }
+    async fn complete_migration(&self, target_version: &str) -> RepositoryResult<()> {
+        let migration = Migration::new(Some(target_version.to_string()), Some(target_version.to_string()));
+        self.update_migration_table(migration).await
+    }
+
+    pub async fn migrate_021_to_022(&self) -> RepositoryResult<()> {
+        log::info!("Starting migration record");
+        let migration = self.start_migration("0.2.1", "0.2.2").await;
+        match migration {
+            Ok(_) => {
+                log::info!("Updating Faeries database");
+                let db = self.db.lock().await.connect().unwrap();
+                let result = db.execute(
+                    "ALTER TABLE faeries DROP COLUMN auth_token",
+                    ()
+                ).await;
+                match result {
+                    Ok(_) => {
+                        self.complete_migration("0.2.2").await
+                    },
+                    Err(_) => {
+                        log::error!("Error updating Faeries database: {:?}", result);
+                        Err(RepositoryError::Other)
+                    },
+                }
+            },
+            Err(err) => Err(err),
+        }
     }
 
     // Mark: - Migrations
     pub async fn migrate_0_to_021(&self) -> RepositoryResult<()> {
         log::info!("Creating migrations table");
-        let result = self.create_table().await;
-        match result {
+        let create_table = self.create_table().await;
+        match create_table {
             Ok(_) => {
-                // Update the migration record to start the transaction of updates
                 log::info!("Starting migration record");
-                let result = self.save(
-                    Migration::new(
-                        // This is the first migration ever
-                        Some("0.0.0".to_string()),
-                        Some("0.2.1".to_string())
-                    ).into()).await;
-                match result {
+                let migration = self.start_migration("0.0.0", "0.2.1").await;
+                let migration_value = Migration::new(Some("0.0.0".to_string()), Some("0.2.1".to_string()));
+                let migration_error = Err(migration_value.into());
+                match migration {
                     Ok(_) => {
-                        // TODO: Figure out a way to do this with transactions
-                        // For now, just create the table as-is; 0.2.2 will add the update_table method
-                        log::info!("Creating faery table");
+                        log::info!("Creating Faeries database");
                         match self.faery_repository.create_table().await {
                             Ok(_) => {
-                                log::info!("Finalizing migration record");
-                                match self.save(
-                                    Migration::new(
-                                        // Save the current version as the target version to indicate
-                                        // that the migration has been completed
-                                        Some("0.2.1".to_string()),
-                                        Some("0.2.1".to_string())
-                                    ).into()).await {
-                                    Ok(_) => Ok(()),
-                                    Err(_) => Err(RepositoryError::MigrationFailed(
-                                        Version::parse("0.2.1").unwrap(),
-                                        Version::parse("0.2.1").unwrap(),
-                                    )),
-                                }
+                                self.complete_migration("0.2.1").await
                             },
-                            Err(_) => Err(RepositoryError::MigrationFailed(
-                                Version::parse("0.2.1").unwrap(),
-                                Version::parse("0.2.1").unwrap(),
-                            ))
+                            Err(_) => migration_error
                         }
                     },
-                    Err(_) => Err(RepositoryError::MigrationFailed(
-                        Version::parse("0.0.0").unwrap(),
-                        Version::parse("0.2.1").unwrap(),
-                    )),
+                    Err(err) => Err(err),
                 }
             },
             Err(_) => Err(RepositoryError::MigrationFailed(

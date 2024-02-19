@@ -16,21 +16,11 @@ impl FaeryRepository {
             db,
         }
     }
-
-    // TODO: Secure this method
-    pub async fn update_auth_token(&self, id: i64, auth_token: String) -> RepositoryResult<()> {
-        let db = self.db.lock().await.connect().unwrap();
-        let result = db.execute("UPDATE faeries SET auth_token = ?1 WHERE id = ?2", params![auth_token, id]).await;
-        match result {
-            Ok(_) => Ok(()),
-            Err(_) => Err(RepositoryError::Other),
-        }
-    }
 }
 
 impl RepositoryItem for Faery {
     fn masked_columns(is_admin: bool) -> Vec<String> {
-        let mut columns = vec!["auth_token".to_string()];
+        let mut columns = vec![];
         if !is_admin {
             columns.push("email".to_string());
         }
@@ -51,7 +41,6 @@ impl RepositoryItem for Faery {
             "name".to_string(),
             "is_admin".to_string(),
             "email".to_string(),
-            "auth_token".to_string(),
             "dross".to_string(),
         ]
     }
@@ -178,7 +167,6 @@ pub struct Faery {
     pub name: String,
     pub email: String,
     pub is_admin: bool,
-    pub auth_token: Option<String>,
     pub dross: u32,
 }
 
@@ -192,8 +180,6 @@ impl Faery {
             name,
             email,
             is_admin,
-            // TODO: Implement static method for inflating from auth_token claims
-            auth_token: None,
             dross,
         }
     }
@@ -227,16 +213,6 @@ impl Faery {
     pub fn dross(&self) -> u32 {
         self.dross
     }
-
-    // This is a method that returns the auth token of the Faery.
-    pub fn auth_token(&self) -> Option<&str> {
-        self.auth_token.as_deref()
-    }
-
-    // This is a method that sets the auth token of the Faery.
-    pub fn set_auth_token(&mut self, auth_token: String) {
-        self.auth_token = Some(auth_token);
-    }
 }
 
 impl Clone for Faery {
@@ -246,7 +222,6 @@ impl Clone for Faery {
             name: self.name.clone(),
             email: self.email.clone(),
             is_admin: self.is_admin,
-            auth_token: self.auth_token.clone(),
             dross: self.dross,
         }
     }
@@ -256,7 +231,6 @@ impl Clone for Faery {
         self.name = source.name.clone();
         self.email = source.email.clone();
         self.is_admin = source.is_admin;
-        self.auth_token = source.auth_token.clone();
         self.dross = source.dross;
     }
 }
