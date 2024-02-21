@@ -67,6 +67,7 @@ impl Repository for EmailRepository {
     type RowIdentifier = i64;
 
     // TODO: make default implementations for cases where the database is not used beyond updating the user's token
+    // ... once default implementations for traits is stable
     async fn create(&self, _: Option<MailerStatus>) -> RepositoryResult<i64> {
         Ok(0)
     }
