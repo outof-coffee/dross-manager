@@ -4,12 +4,14 @@ mod endpoints;
 mod repository;
 mod migrations;
 mod version;
+mod email;
 
 use std::net::SocketAddr;
 use axum::{routing::get, Router};
 use tower_http::services::ServeDir;
 use libsql::Builder;
 use std::sync::Arc;
+use axum::response::{IntoResponse};
 use tokio::sync::Mutex;
 use http::{Method};
 
@@ -21,7 +23,8 @@ pub struct DrossManagerService {
     router: Router
 }
 pub struct DrossManagerState {
-    pub faery_repository: Arc<faery::FaeryRepository>
+    pub faery_repository: Arc<faery::FaeryRepository>,
+    pub email_repository: Arc<email::EmailRepository>
 }
 
 async fn hello_world() -> &'static str {
@@ -40,11 +43,15 @@ async fn axum(
 
     let turso_addr = store.get("TURSO_URL").unwrap();
     let turso_token = store.get("TURSO_TOKEN").unwrap();
+    let mailgun_user = store.get("MAILGUN_USER").unwrap();
+    let mailgun_token = store.get("MAILGUN_PASSWORD").unwrap();
+    let mailgun_domain = store.get("MAILGUN_DOMAIN").unwrap();
     let db = Builder::new_remote(turso_addr, turso_token).build().await.unwrap();
 
     let db = Arc::new(Mutex::new(db));
     let state = Arc::new(DrossManagerState {
         faery_repository: Arc::new(faery::FaeryRepository::new(db.clone())),
+        email_repository: Arc::new(email::EmailRepository::new(mailgun_user, mailgun_token, mailgun_domain))
     });
 
     // TODO: Handle errors
@@ -64,6 +71,7 @@ async fn axum(
         .route("/api/hello", get(hello_world))
         .route("/api/faeries", get(endpoints::list_faeries).post(endpoints::create_faery))
         .route("/api/faeries/:faery_id", get(endpoints::get_faery).put(endpoints::update_faery).delete(endpoints::delete_faery))
+        // .route("/api/test_email", get(send_test_email))
         .layer(ServiceBuilder::new().layer(cors))
         .with_state(state)
         .nest_service("/", ServeDir::new("dross-manager-frontend/dist"));
@@ -72,6 +80,14 @@ async fn axum(
         router
     })
 }
+
+// async fn send_test_email(State(state): State<Arc<DrossManagerState>>) -> Response {
+//     let res = state.clone().email_repository.send_email("Test", "tsalaroth@gmail.com", "This is a test email").await;
+//     match res {
+//         Ok(_) => (StatusCode::OK, Json("Sent")).into_response(),
+//         Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, Json(err)).into_response()
+//     }
+// }
 
 #[shuttle_runtime::async_trait]
 impl shuttle_runtime::Service for DrossManagerService {
