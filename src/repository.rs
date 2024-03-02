@@ -26,7 +26,14 @@ pub trait RepositoryItem {
 pub trait Repository: Sized + Send + Sync {
     type Item: RepositoryItem + Serialize + Sized + Send + Sync;
     type RowIdentifier: RepositoryRowIdentifier;
-    async fn create(&self, template_item: Option<Self::Item>) -> RepositoryResult<Self::RowIdentifier>;
+    async fn create(&self, template_item: Option<Self::Item>) -> RepositoryResult<Self::RowIdentifier> {
+        match template_item {
+            Some(template_item) => {
+                self.save(template_item).await
+            },
+            None => Err(RepositoryError::Other),
+        }
+    }
     async fn save(&self, item: Self::Item) -> RepositoryResult<Self::RowIdentifier>;
     async fn get(&self, id: Self::RowIdentifier) -> RepositoryResult<Self::Item>;
     async fn get_all(&self) -> RepositoryResult<Vec<Self::Item>>;

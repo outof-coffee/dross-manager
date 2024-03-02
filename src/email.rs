@@ -66,12 +66,8 @@ impl Repository for EmailRepository {
     type Item = MailerStatus;
     type RowIdentifier = i64;
 
-    // TODO: make default implementations for cases where the database is not used beyond updating the user's token
-    // ... once default implementations for traits is stable
-    async fn create(&self, _: Option<MailerStatus>) -> RepositoryResult<i64> {
-        Ok(0)
-    }
-
+    // TODO: make default implementations for cases where the database is not used beyond updating
+    // TODO: ... the user's token once default type implementations for traits is stable
     async fn save(&self, _: MailerStatus) -> RepositoryResult<i64> {
         Ok(0)
     }

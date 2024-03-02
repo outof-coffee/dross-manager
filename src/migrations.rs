@@ -1,10 +1,12 @@
 use std::sync::Arc;
-use libsql::Database;
+use libsql::{Database, params};
 use serde::{Deserialize, Serialize};
 use crate::version::VERSION;
 use semver::{Version, VersionReq};
 use tokio::sync::Mutex;
 use crate::faery::FaeryRepository;
+use crate::player;
+use crate::player::PlayerRepository;
 use crate::repository::{Repository, RepositoryError, RepositoryItem, RepositoryResult};
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -114,13 +116,15 @@ impl RepositoryItem for MigrationData {
 #[derive(Clone)]
 pub struct Manager {
     db: Arc<Mutex<Database>>,
+    player_repository: Arc<PlayerRepository>,
     faery_repository: Arc<FaeryRepository>,
 }
 
 impl Manager {
-    pub fn new(db: Arc<Mutex<Database>>, faery_repository: Arc<FaeryRepository>) -> Manager {
+    pub fn new(db: Arc<Mutex<Database>>, player_repository: Arc<PlayerRepository>, faery_repository: Arc<FaeryRepository>) -> Manager {
         Manager {
             db,
+            player_repository,
             faery_repository
         }
     }
@@ -163,7 +167,7 @@ impl Manager {
                                     self.migrate_0_to_021().await.unwrap();
                                 }
                                 return self.migrate_021_to_022().await;
-                            }
+                            },
                             version if version == "0.2.3" => {
                                 if migration_data.current_version.is_none() {
                                     self.migrate_0_to_021().await.unwrap();
@@ -171,8 +175,11 @@ impl Manager {
                                 if migration_data.current_version == Some("0.2.1".to_string()) {
                                     self.migrate_021_to_022().await.unwrap();
                                 }
-                                // return self.migrate_022_to_023().await;
-                            }
+                                self.migrate_022_to_023().await.unwrap();
+                            },
+                            version if version == "0.2.4" => {
+                                // 0.2.4 migrations
+                            },
                             _ => {
                                 log::info!("Unknown target version: {}", target);
                             }
@@ -198,6 +205,7 @@ impl Manager {
         }
     }
 
+    // TODO: make this return a `Migration` that we can just .into() for the migration steps.
     async fn start_migration(&self, current_version: &str, target_version: &str) -> RepositoryResult<()> {
         let migration = Migration::new(Some(current_version.to_string()), Some(target_version.to_string()));
         self.update_migration_table(migration).await
@@ -207,9 +215,63 @@ impl Manager {
         self.update_migration_table(migration).await
     }
 
+    pub async fn migrate_022_to_023(&self) -> RepositoryResult<()> {
+        log::info!("Starting migration record 0.2.2 -> 0.2.3");
+        let migration = self.start_migration("0.2.2", "0.2.3").await;
+        let migration_value =  Migration::new(Some("0.2.2".to_string()), Some("0.2.3".to_string()));
+        match migration {
+            Ok(_) => {
+                log::info!("Creating Player database");
+                match self.player_repository.create_table().await {
+                    Ok(_) => {
+                        let db = self.db.lock().await.connect().unwrap();
+                        let mut stmt = db.prepare("SELECT COUNT(is_admin) from players").await.unwrap();
+                        let mut result = stmt.query(params![]).await.unwrap();
+                        let admin = match result.next().await.unwrap() {
+                            Some(row) => {
+                                let count: i64 = row.get(0).unwrap();
+                                if count == 0 {
+                                    // insert admin user
+                                    log::info!("Inserting admin user");
+                                    let admin_email = std::env::var("ADMIN_EMAIL").unwrap_or_else(|_| {
+                                        "email@example.com".to_string()
+                                    });
+                                    self.player_repository.create(Some(
+                                        player::Model::new(
+                                            None,
+                                            "Admin".to_string(),
+                                            "User".to_string(),
+                                            admin_email,
+                                            None,
+                                            None,
+                                            "Address Example".to_string(),
+                                            true
+                                        )
+                                    )).await
+                                } else {
+                                    Ok(0)
+                                }
+                            }
+                            None => Err(migration_value.into())
+                        };
+                        match admin {
+                            Ok(_) => {
+                                self.complete_migration("0.2.3").await
+                            },
+                            Err(err) => Err(err),
+                        }
+                    },
+                    Err(_) => Err(migration_value.into())
+                }
+            },
+            Err(err) => Err(err),
+        }
+    }
+
     pub async fn migrate_021_to_022(&self) -> RepositoryResult<()> {
-        log::info!("Starting migration record");
+        log::info!("Starting migration record 0.2.1 -> 0.2.2");
         let migration = self.start_migration("0.2.1", "0.2.2").await;
+        let migration_value =  Migration::new(Some("0.2.1".to_string()), Some("0.2.2".to_string()));
         match migration {
             Ok(_) => {
                 log::info!("Updating Faeries database");
@@ -224,7 +286,7 @@ impl Manager {
                     },
                     Err(_) => {
                         log::error!("Error updating Faeries database: {:?}", result);
-                        Err(RepositoryError::Other)
+                        Err(migration_value.into())
                     },
                 }
             },

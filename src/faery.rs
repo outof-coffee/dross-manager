@@ -57,15 +57,6 @@ impl Repository for FaeryRepository {
     type Item = Faery;
     type RowIdentifier = i64;
 
-    async fn create(&self, faery: Option<Faery>) -> RepositoryResult<i64> {
-        match faery {
-            Some(faery) => {
-                self.save(faery).await
-            },
-            None => Err(RepositoryError::Other),
-        }
-    }
-
     async fn save(&self, faery: Faery) -> RepositoryResult<i64> {
         let db = self.db.lock().await.connect().unwrap();
         let result = match faery.id {
@@ -166,6 +157,7 @@ pub struct Faery {
     pub(crate) id: Option<i64>,
     pub name: String,
     pub email: String,
+    // TODO: deprecated
     pub is_admin: bool,
     pub dross: u32,
 }

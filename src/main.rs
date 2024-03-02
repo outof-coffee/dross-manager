@@ -5,6 +5,8 @@ mod repository;
 mod migrations;
 mod version;
 mod email;
+mod player;
+mod auth;
 
 use std::net::SocketAddr;
 use axum::{routing::get, Router};
@@ -23,6 +25,7 @@ pub struct DrossManagerService {
     router: Router
 }
 pub struct DrossManagerState {
+    pub player_repository: Arc<player::PlayerRepository>,
     pub faery_repository: Arc<faery::FaeryRepository>,
     pub email_repository: Arc<email::EmailRepository>
 }
@@ -46,16 +49,19 @@ async fn axum(
     let mailgun_user = store.get("MAILGUN_USER").unwrap();
     let mailgun_token = store.get("MAILGUN_PASSWORD").unwrap();
     let mailgun_domain = store.get("MAILGUN_DOMAIN").unwrap();
+    let admin_email = store.get("ADMIN_EMAIL").unwrap();
+    std::env::set_var("ADMIN_EMAIL", admin_email);
     let db = Builder::new_remote(turso_addr, turso_token).build().await.unwrap();
 
     let db = Arc::new(Mutex::new(db));
     let state = Arc::new(DrossManagerState {
+        player_repository: Arc::new(player::PlayerRepository::new(db.clone())),
         faery_repository: Arc::new(faery::FaeryRepository::new(db.clone())),
         email_repository: Arc::new(email::EmailRepository::new(mailgun_user, mailgun_token, mailgun_domain))
     });
 
     // TODO: Handle errors
-    let manager = migrations::Manager::new(db.clone(), state.faery_repository.clone());
+    let manager = migrations::Manager::new(db.clone(), state.player_repository.clone(), state.faery_repository.clone());
     let needs_migration = manager.needs_migration().await;
     if needs_migration {
         log::info!("Running migrations");
