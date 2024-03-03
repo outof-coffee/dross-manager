@@ -7,11 +7,12 @@ mod version;
 mod email;
 mod player;
 mod auth;
+mod session;
 
 use std::net::SocketAddr;
 use axum::{routing::get, Router};
 use tower_http::services::ServeDir;
-use libsql::Builder;
+use libsql::{Builder, Database};
 use std::sync::Arc;
 use axum::response::{IntoResponse};
 use tokio::sync::Mutex;
@@ -27,7 +28,13 @@ pub struct DrossManagerService {
 pub struct DrossManagerState {
     pub player_repository: Arc<player::PlayerRepository>,
     pub faery_repository: Arc<faery::FaeryRepository>,
-    pub email_repository: Arc<email::EmailRepository>
+    pub email_repository: Arc<email::EmailRepository>,
+    pub jwt_key_pair: JWTKeyPair
+}
+
+pub struct JWTKeyPair {
+    pub public_key: String,
+    pub private_key: String
 }
 
 async fn hello_world() -> &'static str {
@@ -51,13 +58,27 @@ async fn axum(
     let mailgun_domain = store.get("MAILGUN_DOMAIN").unwrap();
     let admin_email = store.get("ADMIN_EMAIL").unwrap();
     std::env::set_var("ADMIN_EMAIL", admin_email);
-    let db = Builder::new_remote(turso_addr, turso_token).build().await.unwrap();
+    let is_development = match std::env::var("ENVIRONMENT") {
+        Ok(env) => env == "dev",
+        _ => false
+    };
+    let db = if is_development {
+        log::info!("using local path");
+        Builder::new_local("dross_manager.sqlite").build().await.unwrap()
+    } else {
+        log::info!("using remote db");
+        Builder::new_remote(turso_addr, turso_token).build().await.unwrap()
+    };
 
     let db = Arc::new(Mutex::new(db));
     let state = Arc::new(DrossManagerState {
         player_repository: Arc::new(player::PlayerRepository::new(db.clone())),
         faery_repository: Arc::new(faery::FaeryRepository::new(db.clone())),
-        email_repository: Arc::new(email::EmailRepository::new(mailgun_user, mailgun_token, mailgun_domain))
+        email_repository: Arc::new(email::EmailRepository::new(mailgun_user, mailgun_token, mailgun_domain)),
+        jwt_key_pair: JWTKeyPair {
+            public_key: store.get("ACCESS_TOKEN_PUBLIC_KEY").unwrap(),
+            private_key: store.get("ACCESS_TOKEN_PRIVATE_KEY").unwrap()
+        }
     });
 
     // TODO: Handle errors

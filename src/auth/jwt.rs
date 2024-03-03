@@ -7,6 +7,8 @@ use axum::response::IntoResponse;
 use serde::{Deserialize, Serialize};
 use axum_extra::extract::cookie::CookieJar;
 use http::{header, StatusCode};
+use base64::{engine::general_purpose, Engine as _};
+use uuid::Uuid;
 use crate::DrossManagerState;
 use crate::player::PlayerData;
 
@@ -20,6 +22,15 @@ pub struct JWTAuthMiddleware {
 pub struct JWTErrorResponse {
     pub status: &'static str,
     pub message: String,
+}
+
+impl From<jsonwebtoken::errors::Error> for JWTErrorResponse {
+    fn from(err: jsonwebtoken::errors::Error) -> Self {
+        JWTErrorResponse {
+            status: "error",
+            message: format!("{:?}", err),
+        }
+    }
 }
 
 pub async fn authenticate(
@@ -50,38 +61,25 @@ pub async fn authenticate(
         (StatusCode::UNAUTHORIZED, Json(error_response))
     })?;
 
-    // let access_token_details =
-    //     match token::verify_jwt_token(data.env.access_token_public_key.to_owned(), &access_token) {
-    //         Ok(token_details) => token_details,
-    //         Err(e) => {
-    //             let error_response = ErrorResponse {
-    //                 status: "fail",
-    //                 message: format!("{:?}", e),
-    //             };
-    //             return Err((StatusCode::UNAUTHORIZED, Json(error_response)));
-    //         }
-    //     };
-    // let access_token_uuid = uuid::Uuid::parse_str(&access_token_details.token_uuid.to_string())
-    //     .map_err(|_| {
-    //         let error_response = ErrorResponse {
-    //             status: "fail",
-    //             message: "Invalid token".to_string(),
-    //         };
-    //         (StatusCode::UNAUTHORIZED, Json(error_response))
-    //     })?;
-    //
-    // let mut redis_client = data
-    //     .redis_client
-    //     .get_async_connection()
-    //     .await
-    //     .map_err(|e| {
-    //         let error_response = ErrorResponse {
-    //             status: "error",
-    //             message: format!("Redis error: {}", e),
-    //         };
-    //         (StatusCode::INTERNAL_SERVER_ERROR, Json(error_response))
-    //     })?;
-    //
+    let access_token_details = match verify_jwt_token(app_state.jwt_key_pair.public_key.to_owned(), &access_token) {
+        Ok(token_details) => token_details,
+        Err(e) => {
+            let error_response = JWTErrorResponse {
+                status: "fail",
+                message: format!("{:?}", e),
+            };
+            return Err((StatusCode::UNAUTHORIZED, Json(error_response)));
+        }
+    };
+    let access_token_uuid = uuid::Uuid::parse_str(&access_token_details.token_uuid.to_string())
+        .map_err(|_| {
+            let error_response = JWTErrorResponse {
+                status: "fail",
+                message: "Invalid token".to_string(),
+            };
+            (StatusCode::UNAUTHORIZED, Json(error_response))
+        })?;
+
     // let redis_token_user_id = redis_client
     //     .get::<_, String>(access_token_uuid.clone().to_string())
     //     .await
@@ -128,4 +126,74 @@ pub async fn authenticate(
 
 }
 //
-// fn generate_jwt_token(user_email: String, ttl: i64, private_key: String)
+fn generate_jwt_token(user_id: i64, ttl: i64, private_key: String) -> Result<TokenDetails, JWTErrorResponse> {
+    let bytes_private_key = general_purpose::STANDARD.decode(private_key).unwrap();
+    let decoded_private_key = String::from_utf8(bytes_private_key).unwrap();
+    let now = chrono::Utc::now();
+
+    let mut token_details = TokenDetails {
+        user_id,
+        token_uuid: Uuid::new_v4(),
+        expires_in: Some((now + chrono::Duration::minutes(ttl)).timestamp()),
+        token: None,
+    };
+
+    let claims = TokenClaims {
+        sub: token_details.user_id.to_string(),
+        token_uuid: token_details.token_uuid.to_string(),
+        exp: token_details.expires_in.unwrap(),
+        iat: now.timestamp(),
+        nbf: now.timestamp(),
+    };
+
+    let header = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::RS256);
+    let token = jsonwebtoken::encode(
+        &header,
+        &claims,
+        &jsonwebtoken::EncodingKey::from_rsa_pem(decoded_private_key.as_bytes())?,
+    )?;
+
+    token_details.token = Some(token);
+    Ok(token_details)
+}
+pub fn verify_jwt_token(
+    public_key: String,
+    token: &str,
+) -> Result<TokenDetails, jsonwebtoken::errors::Error> {
+    let bytes_public_key = general_purpose::STANDARD.decode(public_key).unwrap();
+    let decoded_public_key = String::from_utf8(bytes_public_key).unwrap();
+
+    let validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::RS256);
+
+    let decoded = jsonwebtoken::decode::<TokenClaims>(
+        token,
+        &jsonwebtoken::DecodingKey::from_rsa_pem(decoded_public_key.as_bytes())?,
+        &validation,
+    )?;
+
+    let user_id: i64 = decoded.claims.sub.parse().unwrap();
+    let token_uuid = Uuid::parse_str(decoded.claims.token_uuid.as_str()).unwrap();
+
+    Ok(TokenDetails {
+        token: None,
+        token_uuid,
+        user_id,
+        expires_in: None,
+    })
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TokenDetails {
+    pub token: Option<String>,
+    pub token_uuid: uuid::Uuid,
+    pub user_id: i64,
+    pub expires_in: Option<i64>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TokenClaims {
+    pub sub: String,
+    pub token_uuid: String,
+    pub exp: i64,
+    pub iat: i64,
+    pub nbf: i64,
+}

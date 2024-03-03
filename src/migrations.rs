@@ -176,7 +176,7 @@ impl Manager {
                                 return self.migrate_021_to_022().await;
                             },
                             version if version == "0.2.3" => {
-                                if migration_data.current_version.is_none() {
+                                if migration_data.current_version.is_none() || migration_data.current_version.is_some_and(|v| v == "0.0.0") {
                                     self.migrate_0_to_021().await.unwrap();
                                 }
                                 if migration_data.current_version == Some("0.2.1".to_string()) {
