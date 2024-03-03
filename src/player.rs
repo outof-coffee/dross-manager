@@ -283,6 +283,18 @@ impl PlayerRepository {
             None => Err(RepositoryError::NotFound),
         }
     }
+
+    pub async fn admin_count(&self) -> RepositoryResult<i64> {
+        let db = self.db.lock().await.connect().unwrap();
+        let mut result = db.query("SELECT COUNT(is_admin) from players", ()).await.unwrap();
+        match result.next().await.unwrap() {
+            Some(row) => {
+                let count: i64 = row.get(0).unwrap();
+                Ok(count)
+            },
+            None => Err(RepositoryError::Other),
+        }
+    }
 }
 fn validate_token_age(expiration: i64) -> bool {
     // validates the expiration date is not in the past

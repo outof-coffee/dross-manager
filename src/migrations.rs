@@ -160,45 +160,66 @@ impl Manager {
         self.update_migration_table(current_migration).await.unwrap();
         match self.get(0).await {
             Ok(migration_data) => {
-                match migration_data.target_version {
-                    Some(target) => {
-                        match target {
-                            version if version == "0.2.1" => {
-                                // Assumed to be 0 -> 0.2.1
-                                return self.migrate_0_to_021().await;
-                            },
-                            version if version == "0.2.2" => {
-                                if migration_data.current_version.is_none() || migration_data.current_version.is_some_and(|v| v == "0.0.0") {
-                                    self.migrate_0_to_021().await.unwrap();
-                                    // if we came from 0, we should not update the faeries table
-                                    return self.complete_migration("0.2.2").await
+                if let Some(target) = migration_data.target_version.clone() {
+                    match target.clone() {
+                        version if version == "0.2.1" => {
+                            // Assumed to be 0 -> 0.2.1
+                            return self.migrate_0_to_021(None).await;
+                        },
+                        version if version == "0.2.2" => {
+                            if let Some(current_version) = migration_data.current_version {
+                                match current_version.as_str() {
+                                    "0.0.0" => {
+                                        log::info!("running new installation migration for 0.2.2");
+                                        self.migrate_0_to_021(Some(target.clone())).await.unwrap();
+                                        return self.complete_migration("0.2.2").await;
+                                    },
+                                    "0.2.1" => {
+                                        log::info!("migrating from 0.2.1 -> 0.2.2");
+                                        return self.migrate_021_to_022().await;
+                                    }
+                                    _ => {}
                                 }
-                                return self.migrate_021_to_022().await;
-                            },
-                            version if version == "0.2.3" => {
-                                if migration_data.current_version.is_none() || migration_data.current_version.is_some_and(|v| v == "0.0.0") {
-                                    self.migrate_0_to_021().await.unwrap();
-                                }
-                                if migration_data.current_version == Some("0.2.1".to_string()) {
-                                    self.migrate_021_to_022().await.unwrap();
-                                }
-                                self.migrate_022_to_023().await.unwrap();
-                            },
-                            version if version == "0.2.4" => {
-                                // 0.2.4 migrations
-                            },
-                            _ => {
-                                log::info!("Unknown target version: {}", target);
+                            } else {
+                                log::info!("running new installation migration for 0.2.2");
+                                self.migrate_0_to_021(Some(target.clone())).await.unwrap();
+                                return self.complete_migration("0.2.2").await;
                             }
+                        },
+                        version if version == "0.2.3" => {
+                            if let Some(current_version) = migration_data.current_version {
+                                match current_version.as_str() {
+                                    "0.0.0" => {
+                                        log::info!("running new installation migration");
+                                        self.migrate_0_to_021(Some(target.clone())).await.unwrap();
+                                        return self.migrate_022_to_023().await;
+                                    },
+                                    "0.2.1" => {
+                                        log::info!("migrating from 0.2.1");
+                                        self.migrate_021_to_022().await.unwrap();
+                                    },
+                                    "0.2.2" => {
+                                        log::info!("migrating from 0.2.2");
+                                        self.migrate_022_to_023().await.unwrap();
+                                    },
+                                    _ => { }
+                                }
+                            } else {
+                                self.migrate_0_to_021(Some(target.clone())).await.unwrap();
+                                return self.migrate_022_to_023().await;
+                            }
+                        },
+                        version if version == "0.2.4" => {
+                            // 0.2.4 migrations
+                        },
+                        _ => {
+                            log::info!("Unknown target version: {}", target);
                         }
-                    },
-                    None => {
-                        log::info!("No migration record found");
                     }
                 }
             },
-            Err(_) => {
-                log::info!("No migration record found");
+            Err(err) => {
+                log::error!("No migration record found: {:?}", err);
             }
         }
         Ok(())
@@ -206,9 +227,16 @@ impl Manager {
 
     async fn update_migration_table(&self, migration: Migration) -> RepositoryResult<()> {
         let migration_data: MigrationData = migration.clone().into();
+        log::info!("updating migrations table: {:?}", migration_data);
         match self.save(migration_data).await {
-            Ok(_) => Ok(()),
-            Err(_) => Err(migration.into()),
+            Ok(_) => {
+                log::info!("Migration table updated");
+                Ok(())
+            },
+            Err(err) => {
+                log::error!("Error updating migration table: {:?}", err);
+                Err(migration.into())
+            },
         }
     }
 
@@ -219,6 +247,7 @@ impl Manager {
     }
     async fn complete_migration(&self, target_version: &str) -> RepositoryResult<()> {
         let migration = Migration::new(Some(target_version.to_string()), Some(target_version.to_string()));
+        log::info!("Saving completed migration status: {:?}", migration);
         self.update_migration_table(migration).await
     }
 
@@ -231,41 +260,33 @@ impl Manager {
                 log::info!("Creating Player database");
                 match self.player_repository.create_table().await {
                     Ok(_) => {
-                        let db = self.db.lock().await.connect().unwrap();
-                        let mut stmt = db.prepare("SELECT COUNT(is_admin) from players").await.unwrap();
-                        let mut result = stmt.query(params![]).await.unwrap();
-                        let admin = match result.next().await.unwrap() {
-                            Some(row) => {
-                                let count: i64 = row.get(0).unwrap();
-                                if count == 0 {
-                                    // insert admin user
-                                    log::info!("Inserting admin user");
-                                    let admin_email = std::env::var("ADMIN_EMAIL").unwrap_or_else(|_| {
-                                        "email@example.com".to_string()
-                                    });
-                                    self.player_repository.create(Some(
-                                        player::Model::new(
-                                            None,
-                                            "Admin".to_string(),
-                                            "User".to_string(),
-                                            admin_email,
-                                            None,
-                                            None,
-                                            "Address Example".to_string(),
-                                            true
-                                        )
-                                    )).await
-                                } else {
-                                    Ok(0)
-                                }
+                        let admin_count = self.player_repository.admin_count().await.unwrap_or(0);
+                        if admin_count == 0 {
+                            // insert admin user
+                            log::info!("Inserting admin user");
+                            let admin_email = std::env::var("ADMIN_EMAIL").unwrap_or_else(|_| {
+                                "email@example.com".to_string()
+                            });
+                            match self.player_repository.create(Some(
+                                player::Model::new(
+                                    None,
+                                    "Admin".to_string(),
+                                    "User".to_string(),
+                                    admin_email,
+                                    None,
+                                    None,
+                                    "Address Example".to_string(),
+                                    true
+                                )
+                            )).await {
+                                Ok(_) => {
+                                    log::info!("completing migration for 0.2.2 -> 0.2.3");
+                                    self.complete_migration("0.2.3").await
+                                },
+                                Err(err) => Err(err),
                             }
-                            None => Err(migration_value.into())
-                        };
-                        match admin {
-                            Ok(_) => {
-                                self.complete_migration("0.2.3").await
-                            },
-                            Err(err) => Err(err),
+                        } else {
+                            Ok(())
                         }
                     },
                     Err(_) => Err(migration_value.into())
@@ -302,7 +323,7 @@ impl Manager {
     }
 
     // Mark: - Migrations
-    pub async fn migrate_0_to_021(&self) -> RepositoryResult<()> {
+    pub async fn migrate_0_to_021(&self, completion_target: Option<String>) -> RepositoryResult<()> {
         log::info!("Creating migrations table");
         let create_table = self.create_table().await;
         match create_table {
@@ -316,6 +337,9 @@ impl Manager {
                         log::info!("Creating Faeries database");
                         match self.faery_repository.create_table().await {
                             Ok(_) => {
+                                if let Some(target) = completion_target {
+                                    return self.complete_migration(&target).await;
+                                }
                                 self.complete_migration("0.2.1").await
                             },
                             Err(_) => migration_error
@@ -349,21 +373,44 @@ impl Repository for Manager {
         log::info!("Saving migration: {:?}", item);
         let insert_item = item.clone();
         let result = db.execute(
-            "INSERT INTO migrations (id, current_version, target_version) VALUES (0, ?1, ?2)",
+            "UPDATE migrations SET current_version = ?1, target_version = ?2 WHERE id = 0",
             (insert_item.current_version, insert_item.target_version)
         ).await;
         match result {
-            Ok(_) => Ok(0),
-            Err(_) => {
+            Ok(res) => {
+                if res == 0 {
+                    let update_item = item.clone();
+                    match db.execute(
+                        "INSERT INTO migrations (id, current_version, target_version) VALUES (0, ?1, ?2)",
+                        (update_item.current_version, update_item.target_version)
+                    ).await {
+                        Ok(_) => Ok(0),
+                        Err(err) => {
+                            log::error!("Error inserting migration row: {:?}", err);
+                            Err(RepositoryError::Other)
+                        }
+                    }
+                } else {
+                    Ok(0)
+                }
+            },
+            Err(err) => {
                 // Try update
+                log::error!("Trying to recover from error by inserting a new migration row: {:?}", err);
                 let update_item = item.clone();
                 let result = db.execute(
-                    "UPDATE migrations SET current_version = ?1, target_version = ?2 WHERE id = 0",
+                    "INSERT INTO migrations (id, current_version, target_version) VALUES (0, ?1, ?2)",
                     (update_item.current_version, update_item.target_version)
                 ).await;
                 match result {
-                    Ok(_) => Ok(0),
-                    Err(_) => Err(RepositoryError::Other),
+                    Ok(_) => {
+                        log::info!("Recovered from error.");
+                        Ok(0)
+                    },
+                    Err(err) => {
+                        log::error!("Error trying to recover: {:?}", err);
+                        Err(RepositoryError::Other)
+                    },
                 }
             },
         }
