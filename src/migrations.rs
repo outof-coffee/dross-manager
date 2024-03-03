@@ -146,10 +146,15 @@ impl Manager {
     }
 
     pub async fn migrate(&self) -> RepositoryResult<()> {
-        let current_state: Migration = self.get(0).await.unwrap_or_else(|_| Migration::new(None, None).into()).into();
+        let mut current_state: Migration = self.get(0).await.unwrap_or_else(|_| Migration::new(None, None).into()).into();
         log::info!("Migrating to {}", VERSION.to_string());
+        // TODO: remove the MigrationData / Migration split
+        if current_state.current_version.is_none() && current_state.target_version.to_string() == VERSION.to_string() {
+            self.create_table().await.unwrap();
+            current_state.current_version = Some(Version::parse("0.0.0").unwrap());
+        }
         let current_migration: Migration = Migration::new(
-            current_state.current_version.map(|v| v.to_string()),
+            current_state.current_version.clone().map(|v| v.to_string()),
             Some(VERSION.to_string())
         );
         self.update_migration_table(current_migration).await.unwrap();
@@ -163,8 +168,10 @@ impl Manager {
                                 return self.migrate_0_to_021().await;
                             },
                             version if version == "0.2.2" => {
-                                if migration_data.current_version.is_none() {
+                                if migration_data.current_version.is_none() || migration_data.current_version.is_some_and(|v| v == "0.0.0") {
                                     self.migrate_0_to_021().await.unwrap();
+                                    // if we came from 0, we should not update the faeries table
+                                    return self.complete_migration("0.2.2").await
                                 }
                                 return self.migrate_021_to_022().await;
                             },
