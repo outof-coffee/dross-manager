@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use libsql::Database;
+use libsql::{Connection, Database};
 use serde::{Deserialize, Serialize};
 use crate::version::VERSION;
 use semver::{Version, VersionReq};
@@ -113,12 +113,12 @@ impl RepositoryItem for MigrationData {
 
 #[derive(Clone)]
 pub struct Manager {
-    db: Arc<Mutex<Database>>,
+    db: Arc<Mutex<Connection>>,
     faery_repository: Arc<FaeryRepository>,
 }
 
 impl Manager {
-    pub fn new(db: Arc<Mutex<Database>>, faery_repository: Arc<FaeryRepository>) -> Manager {
+    pub fn new(db: Arc<Mutex<Connection>>, faery_repository: Arc<FaeryRepository>) -> Manager {
         Manager {
             db,
             faery_repository
@@ -220,7 +220,7 @@ impl Manager {
         match migration {
             Ok(_) => {
                 log::info!("Updating Faeries database");
-                let db = self.db.lock().await.connect().unwrap();
+                let db = self.db.lock().await;
                 let result = db.execute(
                     "ALTER TABLE faeries DROP COLUMN auth_token",
                     ()
@@ -283,7 +283,7 @@ impl Repository for Manager {
     }
 
     async fn save(&self, item: MigrationData) -> RepositoryResult<i64> {
-        let db = self.db.lock().await.connect().unwrap();
+        let db = self.db.lock().await;
         log::info!("Saving migration: {:?}", item);
         let insert_item = item.clone();
         let result = db.execute(
@@ -308,14 +308,14 @@ impl Repository for Manager {
     }
 
     async fn get(&self, _: i64) -> RepositoryResult<MigrationData> {
-        let db = self.db.lock().await.connect().unwrap();
+        let db = self.db.lock().await;
         let result = db.query(
             "SELECT current_version, target_version FROM migrations WHERE id = 0",
             ()
         ).await;
         match result {
             Ok(mut rows) => {
-                let result = rows.next().await;
+                let result = rows.next();
                 match result {
                     Ok(Some(row)) => {
                         let current_version: String = row.get(0).unwrap();
@@ -344,7 +344,7 @@ impl Repository for Manager {
     }
 
     async fn create_table(&self) -> RepositoryResult<()> {
-        let db = self.db.lock().await.connect().unwrap();
+        let db = self.db.lock().await;
         let result = db.execute(
             "CREATE TABLE IF NOT EXISTS migrations (
                     id INTEGER PRIMARY KEY CHECK (id = 0),
