@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use libsql::{Row, params, Database, Connection};
+use libsql::{Row, params, Connection};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use crate::dross::{DrossError, DrossHolder, DrossResult};

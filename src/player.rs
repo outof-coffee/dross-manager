@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use chrono::{Duration, Utc};
-use libsql::{Database, params};
+use libsql::{Connection, Database, params};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use crate::repository::{Repository, RepositoryError, RepositoryItem, RepositoryResult};
@@ -240,18 +240,18 @@ pub struct PlayerUpdateRequest {
 }
 
 pub struct PlayerRepository {
-    db: Arc<Mutex<Database>>,
+    db: Arc<Mutex<Connection>>,
 }
 
 impl PlayerRepository {
-    pub fn new(db: Arc<Mutex<Database>>) -> PlayerRepository {
+    pub fn new(db: Arc<Mutex<Connection>>) -> PlayerRepository {
         PlayerRepository {
             db,
         }
     }
 
     pub async fn new_token(&self, id: i64) -> RepositoryResult<String> {
-        let db = self.db.lock().await.connect().unwrap();
+        let db = self.db.lock().await;
         let token_data = TokenData::new();
         let result = db.execute("UPDATE players SET auth_token = ?1, auth_token_expires = ?2 WHERE id = ?3", params![
             token_data.token.clone(),
@@ -265,11 +265,11 @@ impl PlayerRepository {
     }
 
     pub async fn login(&self, email: String, token: String) -> RepositoryResult<LoginResponse> {
-        let db = self.db.lock().await.connect().unwrap();
+        let db = self.db.lock().await;
         // this validates the email and token existing in the same row (valid login)
         let mut stmt = db.prepare("SELECT * FROM players WHERE auth_email = ?1 AND auth_token = ?2").await.unwrap();
         let mut res = stmt.query(params![email, token]).await.unwrap();
-        match res.next().await.unwrap() {
+        match res.next().unwrap() {
             Some(row) => {
                 let player = Model::from_response(&row);
                 // Ensure the token hasn't expired
@@ -285,9 +285,9 @@ impl PlayerRepository {
     }
 
     pub async fn admin_count(&self) -> RepositoryResult<i64> {
-        let db = self.db.lock().await.connect().unwrap();
+        let db = self.db.lock().await;
         let mut result = db.query("SELECT COUNT(is_admin) from players", ()).await.unwrap();
-        match result.next().await.unwrap() {
+        match result.next().unwrap() {
             Some(row) => {
                 let count: i64 = row.get(0).unwrap();
                 Ok(count)
@@ -308,7 +308,7 @@ impl Repository for PlayerRepository {
     type RowIdentifier = i64;
 
     async fn save(&self, player: Model) -> RepositoryResult<i64> {
-        let db = self.db.lock().await.connect().unwrap();
+        let db = self.db.lock().await;
         let result = match player.id {
             Some(id) => {
                 let mut stmt = db.prepare("UPDATE players SET first_name = ?1, last_name = ?2, auth_email = ?3, auth_token = ?4, auth_token_expires = ?5, mailing_address = ?6, is_admin = ?7 WHERE id = ?8").await.unwrap();
@@ -336,18 +336,18 @@ impl Repository for PlayerRepository {
             },
         };
         match result {
-            Ok(_) => Ok(db.last_insert_rowid().await),
+            Ok(_) => Ok(db.last_insert_rowid()),
             Err(_) => Err(RepositoryError::Other),
         }
     }
 
     async fn get(&self, id: i64) -> RepositoryResult<Model> {
-        let db = self.db.lock().await.connect().unwrap();
+        let db = self.db.lock().await;
         let mut stmt = db
             .prepare("SELECT * FROM players WHERE id = ?1").await
             .unwrap();
         let mut res = stmt.query([id]).await.unwrap();
-        match res.next().await.unwrap() {
+        match res.next().unwrap() {
             Some(row) => {
                 let player = Model::from_response(&row);
                 Ok(player)
@@ -365,7 +365,7 @@ impl Repository for PlayerRepository {
     }
 
     async fn create_table(&self) -> RepositoryResult<()> {
-        let db = self.db.lock().await.connect().unwrap();
+        let db = self.db.lock().await;
         let result = db.execute(
             r#"CREATE TABLE IF NOT EXISTS players (
     id INTEGER PRIMARY KEY,

@@ -1,12 +1,11 @@
 use std::sync::Arc;
-use libsql::{Connection, Database, params};
+use libsql::Connection;
 use serde::{Deserialize, Serialize};
 use crate::version::VERSION;
 use semver::{Version, VersionReq};
 use tokio::sync::Mutex;
 use crate::faery::FaeryRepository;
 use crate::player;
-use crate::faery;
 use crate::player::PlayerRepository;
 use crate::repository::{Repository, RepositoryError, RepositoryItem, RepositoryResult};
 
