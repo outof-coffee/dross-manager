@@ -79,7 +79,7 @@ impl Repository for FaeryRepository {
             },
         };
         match result {
-            Ok(_) => Ok(db.last_insert_rowid()),
+            Ok(_) => Ok(db.last_insert_rowid().await),
             Err(_) => Err(RepositoryError::Other),
         }
     }
