@@ -8,7 +8,8 @@ mod version;
 use std::net::SocketAddr;
 use axum::{routing::get, Router};
 use tower_http::services::ServeDir;
-use libsql::Builder;
+// use libsql::Builder;
+use libsql::{Database, Connection};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use http::{Method};
@@ -32,17 +33,17 @@ async fn hello_world() -> &'static str {
 async fn axum(
     #[shuttle_secrets::Secrets] store: shuttle_secrets::SecretStore,
     // TODO: Remove entirely or replace with a real connection once shuttle_turso is fixed
-    // #[shuttle_turso::Turso(
-    //     addr = "",
-    //     token = ""
-    // )] turso: Connection
+    #[shuttle_turso::Turso(
+        addr = "{secrets.TURSO_URL}",
+        token = "{secrets.TURSO_TOKEN}"
+    )] turso: Connection
 ) -> Result<DrossManagerService, shuttle_runtime::Error> {
 
     let turso_addr = store.get("TURSO_URL").unwrap();
     let turso_token = store.get("TURSO_TOKEN").unwrap();
-    let db = Builder::new_remote(turso_addr, turso_token).build().await.unwrap();
+    // let db = Builder::new_remote(turso_addr, turso_token).build().await.unwrap();
 
-    let db = Arc::new(Mutex::new(db));
+    let db = Arc::new(Mutex::new(turso));
     let state = Arc::new(DrossManagerState {
         faery_repository: Arc::new(faery::FaeryRepository::new(db.clone())),
     });

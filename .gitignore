@@ -4,3 +4,4 @@ Secrets.toml
 .idea
 dross-manager-frontend/.vscode/
 .vscode/*
+dross-manager.db
