@@ -6,6 +6,7 @@ use semver::{Version, VersionReq};
 use tokio::sync::Mutex;
 use crate::faery::FaeryRepository;
 use crate::player;
+use crate::faery;
 use crate::player::PlayerRepository;
 use crate::repository::{Repository, RepositoryError, RepositoryItem, RepositoryResult};
 
@@ -92,6 +93,14 @@ impl Migration {
                 .unwrap_or_else(|| Version::parse(VERSION).unwrap()),
         }
     }
+
+    async fn new_install_check(&mut self) -> bool {
+        if self.current_version.is_none() && (self.target_version.to_string() == VERSION.to_string()) {
+            self.current_version = Some(Version::parse("0.0.0").unwrap());
+            return true
+        }
+        return false
+    }
 }
 
 impl RepositoryItem for MigrationData {
@@ -129,10 +138,35 @@ impl Manager {
         }
     }
 
+    async fn create_tables(&self) -> RepositoryResult<()> {
+        let migration = self.create_table().await;
+        let player = self.player_repository.create_table().await;
+        let faery = self.faery_repository.create_table().await;
+        match migration {
+            Ok(_) => {
+                log::debug!("Migration table created");
+                match player {
+                    Ok(_) => {
+                        log::debug!("Player table created");
+                        match faery {
+                            Ok(_) => {
+                                log::debug!("Faery table created");
+                                Ok(())
+                            },
+                            Err(err) => Err(err),
+                        }
+                    },
+                    Err(err) => Err(err),
+                }
+            },
+            Err(err) => Err(err),
+        }
+    }
+
     pub async fn needs_migration(&self) -> bool {
-        log::info!("Checking for migrations");
+        log::debug!("Checking for migrations");
         let migration_data = self.get(0).await.unwrap_or_else(|_| Migration::new(None, None).into());
-        log::info!("Migration data: {:?}", migration_data);
+        log::debug!("Migration data: {:?}", migration_data);
         match migration_data.current_version {
             Some(current_version) => {
                 let version_req = VersionReq::parse(
@@ -147,12 +181,12 @@ impl Manager {
 
     pub async fn migrate(&self) -> RepositoryResult<()> {
         let mut current_state: Migration = self.get(0).await.unwrap_or_else(|_| Migration::new(None, None).into()).into();
-        log::info!("Migrating to {}", VERSION.to_string());
         // TODO: remove the MigrationData / Migration split
-        if current_state.current_version.is_none() && current_state.target_version.to_string() == VERSION.to_string() {
-            self.create_table().await.unwrap();
-            current_state.current_version = Some(Version::parse("0.0.0").unwrap());
+        if current_state.new_install_check().await {
+            log::info!("New installation detected. Running initial table creation.");
+            return self.create_tables().await;
         }
+        log::info!("Migrating to {}", VERSION.to_string());
         let current_migration: Migration = Migration::new(
             current_state.current_version.clone().map(|v| v.to_string()),
             Some(VERSION.to_string())
@@ -225,22 +259,22 @@ impl Manager {
         Ok(())
     }
 
+    // TODO: Remove Migration / MigrationData split
     async fn update_migration_table(&self, migration: Migration) -> RepositoryResult<()> {
         let migration_data: MigrationData = migration.clone().into();
-        log::info!("updating migrations table: {:?}", migration_data);
         match self.save(migration_data).await {
             Ok(_) => {
-                log::info!("Migration table updated");
                 Ok(())
             },
             Err(err) => {
                 log::error!("Error updating migration table: {:?}", err);
+                log::debug!("Migration: {:?}", migration);
                 Err(migration.into())
             },
         }
     }
 
-    // TODO: make this return a `Migration` that we can just .into() for the migration steps.
+    // TODO: Remove Migration / MigrationData split
     async fn start_migration(&self, current_version: &str, target_version: &str) -> RepositoryResult<()> {
         let migration = Migration::new(Some(current_version.to_string()), Some(target_version.to_string()));
         self.update_migration_table(migration).await

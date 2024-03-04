@@ -128,14 +128,14 @@ impl shuttle_runtime::Service for DrossManagerService {
 #[cfg(test)]
 mod tests {
     use crate::dross::{DrossHolder, transfer_dross};
-    use crate::faery::Faery;
+    use crate::faery::Model;
 
-    fn new_faery() -> Faery {
-        Faery::new("Tinkerbell".to_string(), "me@example.com".to_string(), false, 0, None)
+    fn new_faery() -> Model {
+        Model::new("Tinkerbell".to_string(), "me@example.com".to_string(), false, 0, None)
     }
 
-    fn new_faery_two() -> Faery {
-        Faery::new("Silvermist".to_string(), "you@example.com".to_string(), false, 0, None)
+    fn new_faery_two() -> Model {
+        Model::new("Silvermist".to_string(), "you@example.com".to_string(), false, 0, None)
     }
 
     #[test]

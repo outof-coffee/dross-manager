@@ -18,7 +18,7 @@ impl FaeryRepository {
     }
 }
 
-impl RepositoryItem for Faery {
+impl RepositoryItem for Model {
     fn masked_columns(is_admin: bool) -> Vec<String> {
         let mut columns = vec![];
         if !is_admin {
@@ -29,9 +29,9 @@ impl RepositoryItem for Faery {
 
     fn saved_columns() -> Vec<String> {
         // get all columns
-        let columns = Faery::all_columns();
+        let columns = Model::all_columns();
         // filter out masked columns, assuming is_admin is true
-        let masked_columns = Faery::masked_columns(true);
+        let masked_columns = Model::masked_columns(true);
         columns.into_iter().filter(|c| !masked_columns.contains(c)).collect()
     }
 
@@ -54,10 +54,10 @@ impl RepositoryItem for Faery {
 #[shuttle_runtime::async_trait]
 // Mark: Repository
 impl Repository for FaeryRepository {
-    type Item = Faery;
+    type Item = Model;
     type RowIdentifier = i64;
 
-    async fn save(&self, faery: Faery) -> RepositoryResult<i64> {
+    async fn save(&self, faery: Model) -> RepositoryResult<i64> {
         let db = self.db.lock().await.connect().unwrap();
         let result = match faery.id {
             Some(id) => {
@@ -76,7 +76,7 @@ impl Repository for FaeryRepository {
     }
 
     // Mark: Faery
-    async fn get(&self, id: i64) -> RepositoryResult<Faery> {
+    async fn get(&self, id: i64) -> RepositoryResult<Model> {
         let db = self.db.lock().await.connect().unwrap();
         let mut stmt = db
             .prepare("SELECT * FROM faeries WHERE id = ?1")
@@ -85,14 +85,14 @@ impl Repository for FaeryRepository {
         let mut res = stmt.query([id]).await.unwrap();
         match res.next().await.unwrap() {
             Some(row) => {
-                let faery = Faery::from_response(&row);
+                let faery = Model::from_response(&row);
                 Ok(faery)
             },
             None => Err(RepositoryError::NotFound),
         }
     }
 
-    async fn get_all(&self) -> RepositoryResult<Vec<Faery>> {
+    async fn get_all(&self) -> RepositoryResult<Vec<Model>> {
         let db = self.db.lock().await.connect().unwrap();
         let result = db.query("SELECT * FROM faeries", ()).await;
         let mut res = match result {
@@ -103,11 +103,11 @@ impl Repository for FaeryRepository {
             },
         };
 
-        let mut faeries: Vec<Faery> = Vec::new();
+        let mut faeries: Vec<Model> = Vec::new();
         while let Ok(result_row) = res.next().await {
             match result_row {
                 Some(row) => {
-                    faeries.push(Faery::from_response(&row));
+                    faeries.push(Model::from_response(&row));
                 },
                 None => break,
             }
@@ -153,7 +153,7 @@ impl Repository for FaeryRepository {
 // Faery represents the user of the application.
 // It has the name of the user, their email, an authentication token, and a count of their dross.
 #[derive(Debug, Deserialize, Serialize)]
-pub struct Faery {
+pub struct Model {
     pub(crate) id: Option<i64>,
     pub name: String,
     pub email: String,
@@ -163,11 +163,11 @@ pub struct Faery {
 }
 
 #[allow(dead_code)]
-impl Faery {
+impl Model {
     // This is a method that creates a new Faery.
     // It takes a name and an email and returns a Faery.
-    pub fn new(name: String, email: String, is_admin: bool, dross: u32, id: Option<i64>) -> Faery {
-        Faery {
+    pub fn new(name: String, email: String, is_admin: bool, dross: u32, id: Option<i64>) -> Model {
+        Model {
             id,
             name,
             email,
@@ -176,8 +176,8 @@ impl Faery {
         }
     }
 
-    pub fn from_response(row: &Row) -> Faery {
-        Faery::new(
+    pub fn from_response(row: &Row) -> Model {
+        Model::new(
             row.get(1).unwrap(),
             row.get(3).unwrap(),
             row.get(2).unwrap(),
@@ -207,9 +207,9 @@ impl Faery {
     }
 }
 
-impl Clone for Faery {
+impl Clone for Model {
     fn clone(&self) -> Self {
-        Faery {
+        Model {
             id: self.id,
             name: self.name.clone(),
             email: self.email.clone(),
@@ -227,7 +227,7 @@ impl Clone for Faery {
     }
 }
 
-impl DrossHolder for Faery {
+impl DrossHolder for Model {
     // This is a method that increments the dross of the Faery.
     fn increment_dross(&mut self, amount: u32) -> DrossResult {
         if amount <= 0 {
@@ -262,8 +262,8 @@ pub struct CreateFaeryRequest {
     pub email: String,
 }
 
-impl From<CreateFaeryRequest> for Faery {
+impl From<CreateFaeryRequest> for Model {
     fn from(req: CreateFaeryRequest) -> Self {
-        Faery::new(req.name, req.email, false, 0, None)
+        Model::new(req.name, req.email, false, 0, None)
     }
 }

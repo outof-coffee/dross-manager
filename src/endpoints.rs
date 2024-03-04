@@ -5,7 +5,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use axum::response::{IntoResponse, Response};
 use crate::DrossManagerState;
-use crate::faery::{CreateFaeryRequest, Faery};
+use crate::faery::{CreateFaeryRequest, Model};
 use crate::repository::{Repository, RepositoryError};
 
 pub async fn list_faeries(State(state): State<Arc<DrossManagerState>>) -> Response {
@@ -48,7 +48,7 @@ pub async fn get_faery(State(state): State<Arc<DrossManagerState>>, Path(faery_i
 pub async fn update_faery(
     State(state): State<Arc<DrossManagerState>>,
     Path(faery_id): Path<i64>,
-    payload: Result<Json<Faery>, JsonRejection>
+    payload: Result<Json<Model>, JsonRejection>
 ) -> Response {
     match payload {
         Ok(Json(payload)) => {
@@ -82,7 +82,7 @@ pub async fn create_faery(
     match payload {
         Ok(Json(payload)) => {
             log::info!("Creating faery: {:?}", payload);
-            let faery: Faery = payload.into();
+            let faery: Model = payload.into();
             match state.clone().faery_repository.create(Some(faery.clone())).await {
                 Ok(_) => {
                     (StatusCode::CREATED, Json(faery)).into_response()
