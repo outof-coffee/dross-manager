@@ -14,7 +14,6 @@ use axum::{routing::get, Router};
 use tower_http::services::ServeDir;
 use libsql::Connection;
 use std::sync::Arc;
-use axum::response::IntoResponse;
 use tokio::sync::Mutex;
 use http::{Method};
 
@@ -69,11 +68,8 @@ async fn axum(
 
     // TODO: Handle errors
     let manager = migrations::Manager::new(db.clone(), state.player_repository.clone(), state.faery_repository.clone());
-    let needs_migration = manager.needs_migration().await;
-    if needs_migration {
-        log::info!("Running migrations");
-        manager.migrate().await.unwrap();
-    }
+    log::info!("Running migrations");
+    manager.migrate().await.unwrap();
 
     log::info!("Creating CORS middleware");
     let cors = CorsLayer::new()
@@ -105,8 +101,8 @@ async fn axum(
 #[shuttle_runtime::async_trait]
 impl shuttle_runtime::Service for DrossManagerService {
     async fn bind(mut self, addr: SocketAddr) -> Result<(), shuttle_runtime::Error> {
-        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-        axum::serve(listener, self.router.clone()).await.unwrap();
+        let listener = tokio::net::TcpListener::bind(addr).await?;
+        axum::serve(listener, self.router.clone()).await?;
         Ok(())
     }
 }

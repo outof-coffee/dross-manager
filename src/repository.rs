@@ -2,6 +2,8 @@ use axum::extract::rejection::JsonRejection;
 use semver::Version;
 use serde::Serialize;
 
+use libsql::Error as LibSqlError;
+
 // TODO: move
 #[allow(dead_code)]
 #[derive(Debug, Serialize)]
@@ -11,6 +13,17 @@ pub enum RepositoryError {
     InvalidModel,
     MigrationFailed(Version, Version),
     Other,
+}
+
+impl From<LibSqlError> for RepositoryError {
+    fn from(err: LibSqlError) -> Self {
+        match err {
+            LibSqlError::QueryReturnedNoRows => RepositoryError::NotFound,
+            LibSqlError::ExecuteReturnedRows => RepositoryError::AlreadyExists,
+            _ => RepositoryError::Other,
+        }
+    }
+
 }
 
 pub type RepositoryResult<T> = Result<T, RepositoryError>;

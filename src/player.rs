@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use chrono::{Duration, Utc};
-use libsql::{Connection, Database, params};
+use libsql::{Connection, params};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use crate::repository::{Repository, RepositoryError, RepositoryItem, RepositoryResult};
@@ -253,12 +253,11 @@ impl PlayerRepository {
     pub async fn new_token(&self, id: i64) -> RepositoryResult<String> {
         let db = self.db.lock().await;
         let token_data = TokenData::new();
-        let result = db.execute("UPDATE players SET auth_token = ?1, auth_token_expires = ?2 WHERE id = ?3", params![
+        match db.execute("UPDATE players SET auth_token = ?1, auth_token_expires = ?2 WHERE id = ?3", params![
             token_data.token.clone(),
             token_data.expires,
             id
-        ]).await;
-        match result {
+        ]).await {
             Ok(_) => Ok(token_data.token),
             Err(_) => Err(RepositoryError::Other),
         }
@@ -268,8 +267,7 @@ impl PlayerRepository {
         let db = self.db.lock().await;
         // this validates the email and token existing in the same row (valid login)
         let mut stmt = db.prepare("SELECT * FROM players WHERE auth_email = ?1 AND auth_token = ?2").await.unwrap();
-        let mut res = stmt.query(params![email, token]).await.unwrap();
-        match res.next().unwrap() {
+        match stmt.query(params![email, token]).await?.next()? {
             Some(row) => {
                 let player = Model::from_response(&row);
                 // Ensure the token hasn't expired
@@ -286,8 +284,7 @@ impl PlayerRepository {
 
     pub async fn admin_count(&self) -> RepositoryResult<i64> {
         let db = self.db.lock().await;
-        let mut result = db.query("SELECT COUNT(is_admin) from players", ()).await.unwrap();
-        match result.next().unwrap() {
+        match db.query("SELECT COUNT(is_admin) from players", ()).await?.next()? {
             Some(row) => {
                 let count: i64 = row.get(0).unwrap();
                 Ok(count)

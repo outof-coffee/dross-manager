@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use libsql::{Database, params};
+use libsql::{Connection, params};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use crate::repository::{Repository, RepositoryError, RepositoryItem, RepositoryResult};
@@ -12,7 +12,7 @@ pub struct Session {
 }
 
 pub struct SessionRepository {
-    pub db: Arc<Mutex<Database>>,
+    pub db: Arc<Mutex<Connection>>,
 }
 
 impl RepositoryItem for Session {
@@ -60,7 +60,7 @@ impl Repository for SessionRepository {
     }
 
     async fn create_table(&self) -> RepositoryResult<()> {
-        let db = self.db.lock().await.connect().unwrap();
+        let db = self.db.lock().await;
         let mut stmts = vec![];
         stmts.push("BEGIN".to_string());
         stmts.push("CREATE TABLE IF NOT EXISTS sessions (
@@ -86,7 +86,7 @@ impl Repository for SessionRepository {
 
 impl SessionRepository {
     pub async fn clean_up_expired(&self) -> RepositoryResult<()> {
-        let db = self.db.lock().await.connect().unwrap();
+        let db = self.db.lock().await;
         let now = chrono::Utc::now().timestamp_millis();
         let mut stmt = db.prepare("DELETE FROM sessions WHERE expires_in < ?").await.unwrap();
         match stmt.query(params![now]).await.unwrap() {

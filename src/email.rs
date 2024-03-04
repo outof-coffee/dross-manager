@@ -12,6 +12,24 @@ pub struct EmailRepository {
     smtp_domain: String,
 }
 
+impl From<lettre::transport::smtp::Error> for RepositoryError {
+    fn from(_: lettre::transport::smtp::Error) -> Self {
+        RepositoryError::Other
+    }
+}
+
+impl From<lettre::address::AddressError> for RepositoryError {
+    fn from(_: lettre::address::AddressError) -> Self {
+        RepositoryError::Other
+    }
+}
+
+impl From<lettre::error::Error> for RepositoryError {
+    fn from(_: lettre::error::Error) -> Self {
+        RepositoryError::Other
+    }
+}
+
 impl EmailRepository {
     pub fn new(
         smtp_username: String,
@@ -35,21 +53,19 @@ impl EmailRepository {
         let creds = Credentials::new(self.smtp_username.clone(), self.smtp_token.clone());
 
         let mailer: AsyncSmtpTransport<Tokio1Executor> =
-            AsyncSmtpTransport::<Tokio1Executor>::relay("smtp.mailgun.org")
-                .unwrap()
+            AsyncSmtpTransport::<Tokio1Executor>::relay("smtp.mailgun.org")?
                 .credentials(creds)
                 .build();
 
-        let from: Mailbox = "Fe-Vault <noreply@fe-vault.thehe.art>".parse().unwrap();
+        let from: Mailbox = "Fe-Vault <noreply@fe-vault.thehe.art>".parse()?;
         log::info!("sending from: {}", from.email);
         // TODO: handle unwrap
         let message = Message::builder()
             .from(from)
-            .to(email.parse().unwrap())
+            .to(email.parse()?)
             .subject(subject)
             .header(ContentType::TEXT_PLAIN)
-            .body(message.to_string())
-            .unwrap();
+            .body(message.to_string())?;
 
         log::info!("Sending email to {}.", email);
         if let Err(e) = mailer.send(message).await {
