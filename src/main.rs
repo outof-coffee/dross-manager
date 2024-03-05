@@ -8,6 +8,7 @@ mod email;
 mod player;
 mod auth;
 mod session;
+mod prelude;
 
 use std::net::SocketAddr;
 use axum::{routing::get, Router};
@@ -16,6 +17,7 @@ use libsql::Connection;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use http::{Method};
+use prelude::*;
 
 use tower::{ServiceBuilder};
 use tower_http::cors::{CorsLayer};
@@ -25,9 +27,9 @@ pub struct DrossManagerService {
     router: Router
 }
 pub struct DrossManagerState {
-    pub player_repository: Arc<player::PlayerRepository>,
-    pub faery_repository: Arc<faery::FaeryRepository>,
-    pub email_repository: Arc<email::EmailRepository>,
+    pub player_repository: Arc<PlayerRepository>,
+    pub faery_repository: Arc<FaeryRepository>,
+    pub email_repository: Arc<EmailRepository>,
     pub jwt_key_pair: JWTKeyPair
 }
 
