@@ -36,7 +36,7 @@ impl From<jsonwebtoken::errors::Error> for JWTErrorResponse {
 pub async fn authenticate(
     cookie_jar: CookieJar,
     State(app_state): State<Arc<DrossManagerState>>,
-    mut req: Request<Body>,
+    req: Request<Body>,
     next: Next)  -> Result<impl IntoResponse, (StatusCode, Json<JWTErrorResponse>)> {
     let access_token = cookie_jar.get("access_token")
         .map(|cookie| cookie.value().to_string())
