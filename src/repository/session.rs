@@ -38,15 +38,15 @@ impl Repository for SessionRepository {
     type Item = Session;
     type RowIdentifier = i64;
 
-    async fn create(&self, template_item: Option<Session>) -> RepositoryResult<i64> {
+    async fn create(&self, _template_item: Option<Session>) -> RepositoryResult<i64> {
         todo!()
     }
 
-    async fn save(&self, item: Session) -> RepositoryResult<i64> {
+    async fn save(&self, _item: Session) -> RepositoryResult<i64> {
         todo!()
     }
 
-    async fn get(&self, id: i64) -> RepositoryResult<Session> {
+    async fn get(&self, _id: i64) -> RepositoryResult<Session> {
         todo!()
     }
 
@@ -55,7 +55,7 @@ impl Repository for SessionRepository {
         todo!()
     }
 
-    async fn delete(&self, id: i64) -> RepositoryResult<()> {
+    async fn delete(&self, _id: i64) -> RepositoryResult<()> {
         todo!()
     }
 
@@ -84,6 +84,7 @@ impl Repository for SessionRepository {
     }
 }
 
+#[allow(dead_code)]
 impl SessionRepository {
     pub async fn clean_up_expired(&self) -> RepositoryResult<()> {
         let db = self.db.lock().await;

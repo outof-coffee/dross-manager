@@ -9,6 +9,7 @@ use crate::repository::{Repository, RepositoryError, RepositoryItem, RepositoryR
 pub struct EmailRepository {
     smtp_username: String,
     smtp_token: String,
+    #[allow(dead_code)]
     smtp_domain: String,
 }
 

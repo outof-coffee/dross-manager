@@ -33,6 +33,7 @@ impl From<LibSqlError> for RepositoryError {
 
 pub type RepositoryResult<T> = Result<T, RepositoryError>;
 
+#[allow(dead_code)]
 pub trait RepositoryItem {
     fn masked_columns(is_admin: bool) -> Vec<String>;
     fn saved_columns() -> Vec<String>;
@@ -40,6 +41,7 @@ pub trait RepositoryItem {
     fn table_name() -> String where Self: Sized;
 }
 
+#[allow(dead_code)]
 #[shuttle_runtime::async_trait]
 pub trait Repository: Sized + Send + Sync {
     type Item: RepositoryItem + Serialize + Sized + Send + Sync;
@@ -63,6 +65,7 @@ pub trait Repository: Sized + Send + Sync {
     }
 }
 
+#[allow(dead_code)]
 pub trait RepositoryRowIdentifier {}
 
 impl RepositoryRowIdentifier for u32 {}

@@ -1,3 +1,4 @@
+#![allow(unused_imports, dead_code)]
 use std::sync::Arc;
 use axum::body::Body;
 use axum::extract::{Request, State};
@@ -71,7 +72,7 @@ pub async fn authenticate(
             return Err((StatusCode::UNAUTHORIZED, Json(error_response)));
         }
     };
-    let access_token_uuid = uuid::Uuid::parse_str(&access_token_details.token_uuid.to_string())
+    let _access_token_uuid = uuid::Uuid::parse_str(&access_token_details.token_uuid.to_string())
         .map_err(|_| {
             let error_response = JWTErrorResponse {
                 status: "fail",

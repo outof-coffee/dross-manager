@@ -76,7 +76,7 @@ impl Model {
 }
 
 impl RepositoryItem for Model {
-    fn masked_columns(is_admin: bool) -> Vec<String> {
+    fn masked_columns(_is_admin: bool) -> Vec<String> {
         // TODO: Implement masking with responses
         vec![]
     }
@@ -357,7 +357,7 @@ impl Repository for PlayerRepository {
         todo!()
     }
 
-    async fn delete(&self, id: i64) -> RepositoryResult<()> {
+    async fn delete(&self, _id: i64) -> RepositoryResult<()> {
         todo!()
     }
 

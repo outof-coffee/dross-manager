@@ -14,12 +14,15 @@ pub fn transfer_dross(sender: &mut Model, receiver: &mut Model, amount: u32) -> 
     }
 }
 
+// TODO: remove trait and implement directly on Model
+#[allow(dead_code)]
 pub trait DrossHolder {
     fn increment_dross(&mut self, amount: u32) -> DrossResult;
     fn decrement_dross(&mut self, amount: u32) -> DrossResult;
     fn dross(&self) -> DrossResult;
 }
 
+#[allow(dead_code)]
 pub type DrossResult = Result<u32, DrossError>;
 
 #[allow(dead_code)]
