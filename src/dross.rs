@@ -1,9 +1,9 @@
-use crate::faery::Faery;
+use crate::repository::faery::Model;
 
 // transfer_dross takes a sender and a receiver and an amount of dross to transfer.
 // It returns a Result that is Ok(()) if the transfer was successful and Err(()) if it was not.
 #[allow(dead_code)]
-pub fn transfer_dross(sender: &mut Faery, receiver: &mut Faery, amount: u32) -> DrossResult {
+pub fn transfer_dross(sender: &mut Model, receiver: &mut Model, amount: u32) -> DrossResult {
     match sender.decrement_dross(amount) {
         Ok(_) => {
             receiver.increment_dross(amount)

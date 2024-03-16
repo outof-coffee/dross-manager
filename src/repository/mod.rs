@@ -1,6 +1,12 @@
-use axum::extract::rejection::JsonRejection;
-use semver::Version;
+pub mod faery;
+pub mod email;
+pub mod player;
+pub mod session;
+
 use serde::Serialize;
+use semver::Version;
+use libsql::Error as LibSqlError;
+use axum::extract::rejection::JsonRejection;
 
 // TODO: move
 #[allow(dead_code)]
@@ -11,6 +17,17 @@ pub enum RepositoryError {
     InvalidModel,
     MigrationFailed(Version, Version),
     Other,
+}
+
+impl From<LibSqlError> for RepositoryError {
+    fn from(err: LibSqlError) -> Self {
+        match err {
+            LibSqlError::QueryReturnedNoRows => RepositoryError::NotFound,
+            LibSqlError::ExecuteReturnedRows => RepositoryError::AlreadyExists,
+            _ => RepositoryError::Other,
+        }
+    }
+
 }
 
 pub type RepositoryResult<T> = Result<T, RepositoryError>;
@@ -26,7 +43,14 @@ pub trait RepositoryItem {
 pub trait Repository: Sized + Send + Sync {
     type Item: RepositoryItem + Serialize + Sized + Send + Sync;
     type RowIdentifier: RepositoryRowIdentifier;
-    async fn create(&self, template_item: Option<Self::Item>) -> RepositoryResult<Self::RowIdentifier>;
+    async fn create(&self, template_item: Option<Self::Item>) -> RepositoryResult<Self::RowIdentifier> {
+        match template_item {
+            Some(template_item) => {
+                self.save(template_item).await
+            },
+            None => Err(RepositoryError::Other),
+        }
+    }
     async fn save(&self, item: Self::Item) -> RepositoryResult<Self::RowIdentifier>;
     async fn get(&self, id: Self::RowIdentifier) -> RepositoryResult<Self::Item>;
     async fn get_all(&self) -> RepositoryResult<Vec<Self::Item>>;
@@ -39,10 +63,15 @@ pub trait Repository: Sized + Send + Sync {
 }
 
 pub trait RepositoryRowIdentifier {}
+
 impl RepositoryRowIdentifier for u32 {}
+
 impl RepositoryRowIdentifier for i32 {}
+
 impl RepositoryRowIdentifier for u64 {}
+
 impl RepositoryRowIdentifier for i64 {}
+
 impl RepositoryRowIdentifier for () {}
 
 impl From<JsonRejection> for RepositoryError {

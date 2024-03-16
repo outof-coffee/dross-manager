@@ -1,6 +1,6 @@
 [package]
 name = "dross-manager"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -10,10 +10,10 @@ axum = { version = "0.7.4", features = ["http2"] }
 #libsql = { git = "https://github.com/tursodatabase/libsql" }
 libsql = "0.2.0"
 serde = { version = "1.0.196", features = ["derive"] }
-shuttle-axum = { version = "0.40.0" }
-shuttle-runtime = "0.40.0"
-shuttle-secrets = "0.40.0"
-shuttle-turso = "0.40.0"
+shuttle-axum = { version = "0.41.0" }
+shuttle-runtime = "0.41.0"
+shuttle-secrets = "0.41.0"
+shuttle-turso = "0.41.0"
 tower-http = { version = "0.5.1", features = ["fs", "cors"] }
 tokio = "1.36.0"
 futures = "0.3.30"
@@ -22,3 +22,11 @@ bytes = "1.5.0"
 tower = "0.4.13"
 log = "0.4.20"
 semver = "1.0.21"
+lettre = { version = "0.11.4", features = ["tokio1-native-tls"] }
+rand = "0.8.5"
+chrono = { version = "0.4.34", features = ["serde", "now"]}
+uuid = { version = "1.7.0", features = ["v4"] }
+axum-extra = { version = "0.9.2", features = ["cookie"] }
+rand_chacha = "0.3.1"
+base64 = "0.22.0"
+jsonwebtoken = "9.2.0"
