@@ -6,3 +6,4 @@ pub use crate::repository::email::EmailRepository;
 pub use crate::repository::player::PlayerRepository;
 pub use crate::repository::player::PlayerData;
 pub use crate::repository::session::SessionRepository;
+pub use crate::repository::migrations;

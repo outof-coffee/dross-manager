@@ -2,6 +2,7 @@ pub mod faery;
 pub mod email;
 pub mod player;
 pub mod session;
+pub mod migrations;
 
 use serde::Serialize;
 use semver::Version;

@@ -1,6 +1,5 @@
 mod dross;
 mod endpoints;
-mod migrations;
 mod version;
 mod auth;
 mod prelude;
