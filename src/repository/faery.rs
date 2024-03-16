@@ -1,9 +1,10 @@
-use std::sync::Arc;
-use libsql::{Row, params, Connection};
+use libsql::{Connection, params, Row};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use tokio::sync::Mutex;
 use crate::dross::{DrossError, DrossHolder, DrossResult};
-use crate::repository::{Repository, RepositoryError, RepositoryItem, RepositoryResult};
+use crate::prelude::Repository;
+use crate::repository::{RepositoryError, RepositoryItem, RepositoryResult};
 
 #[derive(Clone)]
 pub struct FaeryRepository {

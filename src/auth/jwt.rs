@@ -10,7 +10,7 @@ use http::{header, StatusCode};
 use base64::{engine::general_purpose, Engine as _};
 use uuid::Uuid;
 use crate::DrossManagerState;
-use crate::player::PlayerData;
+use crate::prelude::*;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct JWTAuthMiddleware {

@@ -1,14 +1,10 @@
-mod faery;
 mod dross;
 mod endpoints;
-mod repository;
 mod migrations;
 mod version;
-mod email;
-mod player;
 mod auth;
-mod session;
 mod prelude;
+mod repository;
 
 use std::net::SocketAddr;
 use axum::{routing::get, Router};
@@ -59,9 +55,9 @@ async fn axum(
 
     let db = Arc::new(Mutex::new(turso));
     let state = Arc::new(DrossManagerState {
-        player_repository: Arc::new(player::PlayerRepository::new(db.clone())),
-        faery_repository: Arc::new(faery::FaeryRepository::new(db.clone())),
-        email_repository: Arc::new(email::EmailRepository::new(mailgun_user, mailgun_token, mailgun_domain)),
+        player_repository: Arc::new(PlayerRepository::new(db.clone())),
+        faery_repository: Arc::new(FaeryRepository::new(db.clone())),
+        email_repository: Arc::new(EmailRepository::new(mailgun_user, mailgun_token, mailgun_domain)),
         jwt_key_pair: JWTKeyPair {
             public_key: store.get("ACCESS_TOKEN_PUBLIC_KEY").unwrap(),
             private_key: store.get("ACCESS_TOKEN_PRIVATE_KEY").unwrap()
@@ -112,7 +108,7 @@ impl shuttle_runtime::Service for DrossManagerService {
 #[cfg(test)]
 mod tests {
     use crate::dross::{DrossHolder, transfer_dross};
-    use crate::faery::Model;
+    use crate::repository::faery::Model;
 
     fn new_faery() -> Model {
         Model::new("Tinkerbell".to_string(), "me@example.com".to_string(), false, 0, None)

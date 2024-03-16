@@ -5,8 +5,8 @@ use axum::http::StatusCode;
 use axum::Json;
 use axum::response::{IntoResponse, Response};
 use crate::DrossManagerState;
-use crate::faery::{CreateFaeryRequest, Model};
 use crate::repository::{Repository, RepositoryError};
+use crate::repository::faery::{CreateFaeryRequest, Model};
 
 pub async fn list_faeries(State(state): State<Arc<DrossManagerState>>) -> Response {
     log::info!("Getting all faeries");

@@ -1,4 +1,4 @@
-use crate::faery::Model;
+use crate::repository::faery::Model;
 
 // transfer_dross takes a sender and a receiver and an amount of dross to transfer.
 // It returns a Result that is Ok(()) if the transfer was successful and Err(()) if it was not.

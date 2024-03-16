@@ -1,8 +1,12 @@
-use axum::extract::rejection::JsonRejection;
-use semver::Version;
-use serde::Serialize;
+pub mod faery;
+pub mod email;
+pub mod player;
+pub mod session;
 
+use serde::Serialize;
+use semver::Version;
 use libsql::Error as LibSqlError;
+use axum::extract::rejection::JsonRejection;
 
 // TODO: move
 #[allow(dead_code)]
@@ -59,10 +63,15 @@ pub trait Repository: Sized + Send + Sync {
 }
 
 pub trait RepositoryRowIdentifier {}
+
 impl RepositoryRowIdentifier for u32 {}
+
 impl RepositoryRowIdentifier for i32 {}
+
 impl RepositoryRowIdentifier for u64 {}
+
 impl RepositoryRowIdentifier for i64 {}
+
 impl RepositoryRowIdentifier for () {}
 
 impl From<JsonRejection> for RepositoryError {
