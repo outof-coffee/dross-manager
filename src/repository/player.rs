@@ -25,7 +25,7 @@ struct TokenData {
 impl TokenData {
     // TODO: calculate token
     pub fn new() -> TokenData {
-        let expiration_date = Utc::now() + Duration::minutes(15);
+        let expiration_date = Utc::now() + Duration::try_minutes(15).unwrap();
         TokenData {
             token: "token".to_string(),
             expires: expiration_date.timestamp_millis()

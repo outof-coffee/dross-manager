@@ -135,7 +135,7 @@ fn generate_jwt_token(user_id: i64, ttl: i64, private_key: String) -> Result<Tok
     let mut token_details = TokenDetails {
         user_id,
         token_uuid: Uuid::new_v4(),
-        expires_in: Some((now + chrono::Duration::minutes(ttl)).timestamp()),
+        expires_in: Some((now + chrono::Duration::try_minutes(ttl).unwrap()).timestamp()),
         token: None,
     };
 
