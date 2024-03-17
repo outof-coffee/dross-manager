@@ -32,8 +32,10 @@ use rand_chacha::ChaCha8Rng;
 impl TokenData {
     pub fn new(user_id: i64) -> TokenData {
         let expiration_date = Utc::now() + Duration::try_minutes(15).unwrap();
+        // Add the current millis to the user_id
+        let seed = user_id + Utc::now().timestamp_millis();
         // use user_id as a seed for rand to generate a large 64-bit number
-        let rng = ChaCha8Rng::seed_from_u64(user_id as u64);
+        let rng = ChaCha8Rng::seed_from_u64(seed as u64);
         let r = rng.sample_iter(&Alphanumeric).take(64).collect::<Vec<_>>();
         let token = String::from_utf8_lossy(&r).to_string();
         TokenData {

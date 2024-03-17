@@ -1,9 +1,9 @@
 mod dross;
 mod version;
-mod auth;
 mod prelude;
 mod repository;
 mod endpoints;
+mod middleware;
 
 use std::net::SocketAddr;
 use axum::{routing::get, Router, Extension};
@@ -60,15 +60,10 @@ async fn axum(
         }
     });
 
-    // TODO: Handle errors
     // TODO: Migrate to a migration service and / or remove the need to pass in the repositories like this
     let manager = migrations::Manager::new(db.clone(), player_repository.clone(), faery_repository.clone());
     log::info!("Running migrations");
     manager.migrate().await.unwrap();
-
-    log::info!("Creating CORS middleware");
-    let cors = CorsLayer::new()
-        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE]);
 
     log::info!("Creating routers");
     log::info!("Creating faeries router");
@@ -87,18 +82,24 @@ async fn axum(
         .layer(Extension(player_repository));
 
     log::info!("Creating main api router");
+    log::info!("Creating CORS middleware");
+    let cors = CorsLayer::new()
+        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE]);
     let api_router = Router::new()
         .route("/hello", get(hello_world))
         .nest("/faeries", faery_router)
-        .nest("/auth", auth_router);
+        .nest("/auth", auth_router)
+        .layer(ServiceBuilder::new().layer(cors));
+
+    log::info!("Creating web router");
+    let web_router = Router::new()
+        .nest_service("/", ServeDir::new("dross-manager-frontend/dist"));
 
     log::info!("Creating main application router");
     let router = Router::new()
         .nest("/api", api_router)
-        .layer(ServiceBuilder::new().layer(cors))
-        // TODO: remove this and replace with user state / session info from JWT
-        .with_state(state)
-        .nest_service("/", ServeDir::new("dross-manager-frontend/dist"));
+        .merge(web_router)
+        .with_state(state);
 
     Ok(DrossManagerService {
         router
