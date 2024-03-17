@@ -36,7 +36,7 @@ impl TokenData {
         let r = rng.sample_iter(&Alphanumeric).take(64).collect::<Vec<_>>();
         let token = String::from_utf8_lossy(&r).to_string();
         TokenData {
-            token: format!("{}-token", token),
+            token: format!("{}", token),
             expires: expiration_date.timestamp_millis()
         }
     }
