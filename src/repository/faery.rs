@@ -269,3 +269,56 @@ impl From<CreateFaeryRequest> for Model {
         Model::new(req.name, req.email, false, 0, None)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::dross::{DrossHolder, transfer_dross};
+    use crate::repository::faery::Model;
+
+    fn new_faery() -> Model {
+        Model::new("Tinkerbell".to_string(), "me@example.com".to_string(), false, 0, None)
+    }
+
+    fn new_faery_two() -> Model {
+        Model::new("Silvermist".to_string(), "you@example.com".to_string(), false, 0, None)
+    }
+
+    #[test]
+    fn test_new_faery() {
+        let faery = new_faery();
+        assert_eq!(faery.name(), "Tinkerbell");
+        assert_eq!(faery.email(), "me@example.com");
+    }
+
+    #[test]
+    fn test_increment_dross() {
+        let mut faery = new_faery();
+        assert_eq!(faery.dross(), 0);
+        let _ = faery.increment_dross(1);
+        assert_eq!(faery.dross(), 1);
+    }
+
+    #[test]
+    fn test_decrement_dross() {
+        let mut faery = new_faery();
+        assert_eq!(faery.dross(), 0);
+        let _ = faery.increment_dross(1);
+        assert_eq!(faery.dross(), 1);
+        let _ = faery.decrement_dross(1);
+        assert_eq!(faery.dross(), 0);
+    }
+
+    #[test]
+    fn test_transfer_dross() {
+        let mut faery = new_faery();
+        let mut faery_two = new_faery_two();
+        assert_eq!(faery.dross(), 0);
+        assert_eq!(faery_two.dross(), 0);
+        let _ = faery.increment_dross(1);
+        assert_eq!(faery.dross(), 1);
+        assert_eq!(faery_two.dross(), 0);
+        transfer_dross(&mut faery, &mut faery_two, 1).unwrap();
+        assert_eq!(faery.dross(), 0);
+        assert_eq!(faery_two.dross(), 1);
+    }
+}

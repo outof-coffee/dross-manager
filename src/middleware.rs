@@ -1,3 +1,231 @@
+
+pub mod session {
+    use std::sync::Arc;
+    use axum::body::Body;
+    use axum::extract::{Request, State};
+    use axum::Json;
+    use axum::middleware::Next;
+    use axum::response::IntoResponse;
+    use axum_extra::extract::CookieJar;
+    use base64::Engine;
+    use base64::engine::general_purpose;
+    use chrono::Utc;
+    use http::{header, StatusCode};
+    use serde::{Deserialize, Serialize};
+    use uuid::Uuid;
+    use crate::service::DrossManagerState;
+    use crate::prelude::PlayerData;
+    use crate::repository::player::LoginResponse;
+
+    use libsql::params;
+    use shuttle_runtime::async_trait;
+    use tower_sessions_core::{
+        session::{Id, Record},
+        session_store::{self, ExpiredDeletion},
+        SessionStore,
+    };
+
+    #[derive(Debug)]
+    pub enum LibSqlStoreError {
+        LibSql,
+        Encode,
+        Decode,
+    }
+
+    impl From<LibSqlStoreError> for session_store::Error {
+        fn from(err: LibSqlStoreError) -> Self {
+            match err {
+                LibSqlStoreError::LibSql => session_store::Error::Backend("libsql".to_string()),
+                LibSqlStoreError::Decode => session_store::Error::Decode("decode".to_string()),
+                LibSqlStoreError::Encode => session_store::Error::Encode("encode".to_string()),
+            }
+        }
+    }
+
+    /// A libSQL session store.
+    #[derive(Clone)]
+    pub struct LibSqlStore {
+        connection: libsql::Connection,
+        table_name: String,
+    }
+
+    // Need this since connection does not implement Debug
+    impl std::fmt::Debug for LibSqlStore {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("LibsqlStore")
+                // Probably want to handle this differently
+                .field("connection", &std::any::type_name::<libsql::Connection>())
+                .field("table_name", &self.table_name)
+                .finish()
+        }
+    }
+
+    impl LibSqlStore {
+        /// Create a new libSQL store with the provided connection pool.
+        pub fn new(client: libsql::Connection) -> Self {
+            Self {
+                connection: client,
+                table_name: "tower_sessions".into(),
+            }
+        }
+
+        /// Set the session table name with the provided name.
+        pub fn with_table_name(mut self, table_name: impl AsRef<str>) -> Result<Self, String> {
+            let table_name = table_name.as_ref();
+            if !is_valid_table_name(table_name) {
+                return Err(format!(
+                    "Invalid table name '{}'. Table names must be alphanumeric and may contain \
+                 hyphens or underscores.",
+                    table_name
+                ));
+            }
+
+            self.table_name = table_name.to_owned();
+            Ok(self)
+        }
+
+        /// Migrate the session schema.
+        pub async fn migrate(&self) -> libsql::Result<()> {
+            let query = format!(
+                r#"
+            create table if not exists {}
+            (
+                id text primary key not null,
+                data blob not null,
+                expiry_date integer not null
+            )
+            "#,
+                self.table_name
+            );
+            self.connection.execute(&query, ()).await?;
+
+            Ok(())
+        }
+    }
+
+    #[async_trait]
+    impl ExpiredDeletion for LibSqlStore {
+        async fn delete_expired(&self) -> session_store::Result<()> {
+            let query = format!(
+                r#"
+            delete from {table_name}
+            where expiry_date < unixepoch('now')
+            "#,
+                table_name = self.table_name
+            );
+            self.connection
+                .execute(&query, ())
+                .await
+                .map_err(|_| {
+                    LibSqlStoreError::LibSql
+                })?;
+            Ok(())
+        }
+    }
+
+    #[async_trait]
+    impl SessionStore for LibSqlStore {
+        async fn save(&self, record: &Record) -> session_store::Result<()> {
+            let query = format!(
+                r#"
+            insert into {}
+              (id, data, expiry_date) values (?, ?, ?)
+            on conflict(id) do update set
+              data = excluded.data,
+              expiry_date = excluded.expiry_date
+            "#,
+                self.table_name
+            );
+            self.connection
+                .execute(
+                    &query,
+                    params![
+                    record.id.to_string(),
+                    rmp_serde::to_vec(record).map_err(|_| {
+                            LibSqlStoreError::Encode
+                        })?,
+                    record.expiry_date.unix_timestamp()
+                ],
+                )
+                .await
+                .map_err(|_| {
+                    LibSqlStoreError::LibSql
+                })?;
+
+            Ok(())
+        }
+
+        async fn load(&self, session_id: &Id) -> session_store::Result<Option<Record>> {
+            let query = format!(
+                r#"
+            select data from {}
+            where id = ? and expiry_date > ?
+            "#,
+                self.table_name
+            );
+
+            let mut data = self
+                .connection
+                .query(
+                    &query,
+                    params![
+                    session_id.to_string(),
+                    Utc::now().timestamp(),
+                ],
+                )
+                .await
+                .map_err(|_| {
+                    LibSqlStoreError::LibSql
+                })?;
+
+            if let Ok(Some(data)) = data.next() {
+                Ok(Some(
+                    rmp_serde::from_slice(
+                        data.get_value(0)
+                            .map_err(|e| {
+                                LibSqlStoreError::LibSql
+                            })
+                            .unwrap()
+                            .as_blob()
+                            .unwrap(),
+                    )
+                        .map_err(|_| {
+                            LibSqlStoreError::Decode
+                        })?,
+                ))
+            } else {
+                Ok(None)
+            }
+        }
+
+        async fn delete(&self, session_id: &Id) -> session_store::Result<()> {
+            let query = format!(
+                r#"
+            delete from {} where id = ?
+            "#,
+                self.table_name
+            );
+
+            self.connection
+                .execute(&query, params![session_id.to_string()])
+                .await
+                .map_err(|_| {
+                    LibSqlStoreError::LibSql
+                })?;
+
+            Ok(())
+        }
+    }
+
+    fn is_valid_table_name(name: &str) -> bool {
+        !name.is_empty()
+            && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    }
+
+}
+
 pub mod auth {
     use std::sync::Arc;
     use axum::body::Body;
@@ -11,7 +239,7 @@ pub mod auth {
     use http::{header, StatusCode};
     use serde::{Deserialize, Serialize};
     use uuid::Uuid;
-    use crate::DrossManagerState;
+    use crate::service::DrossManagerState;
     use crate::prelude::PlayerData;
     use crate::repository::player::LoginResponse;
 
