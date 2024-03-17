@@ -26,9 +26,6 @@ struct TokenData {
 use rand::prelude::*;
 use rand_chacha::ChaCha8Rng;
 
-
-// let token = TokenData::new(user_id);
-
 impl TokenData {
     pub fn new(user_id: i64) -> TokenData {
         let expiration_date = Utc::now() + Duration::try_minutes(15).unwrap();
