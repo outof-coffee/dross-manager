@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use chrono::{Duration, Utc};
 use libsql::{Connection, params};
+use rand::distributions::Alphanumeric;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use crate::repository::{Repository, RepositoryError, RepositoryItem, RepositoryResult};
@@ -22,12 +23,21 @@ struct TokenData {
     expires: i64
 }
 
+use rand::prelude::*;
+use rand_chacha::ChaCha8Rng;
+
+
+// let token = TokenData::new(user_id);
+
 impl TokenData {
-    // TODO: calculate token
-    pub fn new() -> TokenData {
+    pub fn new(user_id: i64) -> TokenData {
         let expiration_date = Utc::now() + Duration::try_minutes(15).unwrap();
+        // use user_id as a seed for rand to generate a large 64-bit number
+        let rng = ChaCha8Rng::seed_from_u64(user_id as u64);
+        let r = rng.sample_iter(&Alphanumeric).take(64).collect::<Vec<_>>();
+        let token = String::from_utf8_lossy(&r).to_string();
         TokenData {
-            token: "token".to_string(),
+            token: format!("{}-token", token),
             expires: expiration_date.timestamp_millis()
         }
     }
@@ -67,11 +77,6 @@ impl Model {
             mailing_address: row.get(6).unwrap(),
             is_admin: row.get(7).unwrap(),
         }
-    }
-
-    pub fn new_hash(&self) -> String {
-        use rand::distributions::{Alphanumeric, DistString};
-        Alphanumeric.sample_string(&mut rand::thread_rng(), 24)
     }
 }
 
@@ -250,9 +255,13 @@ impl PlayerRepository {
         }
     }
 
-    pub async fn new_token(&self, id: i64) -> RepositoryResult<String> {
+    pub async fn generate_token(&self, id: Option<i64>) -> RepositoryResult<String> {
         let db = self.db.lock().await;
-        let token_data = TokenData::new();
+        let id = match id {
+            Some(id) => id,
+            None => return Err(RepositoryError::NotFound),
+        };
+        let token_data = TokenData::new(id);
         match db.execute("UPDATE players SET auth_token = ?1, auth_token_expires = ?2 WHERE id = ?3", params![
             token_data.token.clone(),
             token_data.expires,
@@ -263,20 +272,63 @@ impl PlayerRepository {
         }
     }
 
-    pub async fn login(&self, email: String, token: String) -> RepositoryResult<LoginResponse> {
+    async fn validate_token(&self, token: String) -> RepositoryResult<i64> {
         let db = self.db.lock().await;
-        // this validates the email and token existing in the same row (valid login)
-        let mut stmt = db.prepare("SELECT * FROM players WHERE auth_email = ?1 AND auth_token = ?2").await.unwrap();
-        match stmt.query(params![email, token]).await?.next()? {
+        // TODO: validate expiration timestamp
+        match db.query("SELECT id FROM players WHERE auth_token = ?1", params![token]).await?.next()? {
+            Some(row) => {
+                let id: i64 = row.get(0).unwrap();
+                Ok(id)
+            },
+            None => Err(RepositoryError::NotFound),
+        }
+    }
+
+    pub async fn login(&self, email: String, token: String) -> RepositoryResult<LoginResponse> {
+        log::info!("Logging in with email: {}", email);
+        // scoped to prevent deadlocks later
+        let uid: Option<i64> = {
+            let db = self.db.lock().await;
+            let mut user_id_stmt = db.prepare("SELECT id FROM players WHERE auth_email = ?1").await.unwrap();
+            log::info!("Validating user ID");
+
+            match user_id_stmt.query(params![email.clone()]).await?.next()? {
+                Some(row) => row.get(0).unwrap_or(None),
+                None => None,
+            }
+        };
+
+        log::info!("Validating token...");
+        let token_id = self.validate_token(token.clone()).await?;
+        if uid.unwrap() != token_id {
+            // short-circuit the login process if the token doesn't match the user
+            return Err(RepositoryError::NotFound);
+        }
+        let db = self.db.lock().await;
+        // this validates the id, email and token existing in the same row (valid login)
+        let mut stmt = db.prepare("SELECT * FROM players WHERE id = ?1 AND auth_email = ?2 AND auth_token = ?3").await.unwrap();
+        match stmt.query(params![token_id, email, token]).await?.next()? {
             Some(row) => {
                 let player = Model::from_response(&row);
                 // Ensure the token hasn't expired
                 return if validate_token_age(player.auth_token_expires.unwrap()) {
                     Ok(player.into())
                 } else {
-                    // TODO: implement expired token error
-                    Err(RepositoryError::Other)
+                    Err(RepositoryError::ExpiredGuard)
                 }
+            },
+            None => Err(RepositoryError::NotFound),
+        }
+    }
+
+    pub async fn get_by_email(&self, email: String) -> RepositoryResult<Model> {
+        let db = self.db.lock().await;
+        let mut stmt = db.prepare("SELECT * FROM players WHERE auth_email = ?1").await.unwrap();
+        let mut res = stmt.query(params![email]).await.unwrap();
+        match res.next().unwrap() {
+            Some(row) => {
+                let player = Model::from_response(&row);
+                Ok(player)
             },
             None => Err(RepositoryError::NotFound),
         }

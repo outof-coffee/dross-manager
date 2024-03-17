@@ -1,12 +1,12 @@
 mod dross;
-mod endpoints;
 mod version;
 mod auth;
 mod prelude;
 mod repository;
+mod endpoints;
 
 use std::net::SocketAddr;
-use axum::{routing::get, Router};
+use axum::{routing::get, Router, Extension};
 use tower_http::services::ServeDir;
 use libsql::Connection;
 use std::sync::Arc;
@@ -17,14 +17,10 @@ use prelude::*;
 use tower::{ServiceBuilder};
 use tower_http::cors::{CorsLayer};
 
-
 pub struct DrossManagerService {
     router: Router
 }
 pub struct DrossManagerState {
-    pub player_repository: Arc<PlayerRepository>,
-    pub faery_repository: Arc<FaeryRepository>,
-    pub email_repository: Arc<EmailRepository>,
     pub jwt_key_pair: JWTKeyPair
 }
 
@@ -53,10 +49,11 @@ async fn axum(
     std::env::set_var("ADMIN_EMAIL", admin_email);
 
     let db = Arc::new(Mutex::new(turso));
+    let faery_repository = Arc::new(FaeryRepository::new(db.clone()));
+    let player_repository = Arc::new(PlayerRepository::new(db.clone()));
+    let email_repository = Arc::new(EmailRepository::new(mailgun_user, mailgun_token, mailgun_domain));
+
     let state = Arc::new(DrossManagerState {
-        player_repository: Arc::new(PlayerRepository::new(db.clone())),
-        faery_repository: Arc::new(FaeryRepository::new(db.clone())),
-        email_repository: Arc::new(EmailRepository::new(mailgun_user, mailgun_token, mailgun_domain)),
         jwt_key_pair: JWTKeyPair {
             public_key: store.get("ACCESS_TOKEN_PUBLIC_KEY").unwrap(),
             private_key: store.get("ACCESS_TOKEN_PRIVATE_KEY").unwrap()
@@ -64,7 +61,8 @@ async fn axum(
     });
 
     // TODO: Handle errors
-    let manager = migrations::Manager::new(db.clone(), state.player_repository.clone(), state.faery_repository.clone());
+    // TODO: Migrate to a migration service and / or remove the need to pass in the repositories like this
+    let manager = migrations::Manager::new(db.clone(), player_repository.clone(), faery_repository.clone());
     log::info!("Running migrations");
     manager.migrate().await.unwrap();
 
@@ -72,13 +70,33 @@ async fn axum(
     let cors = CorsLayer::new()
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE]);
 
-    log::info!("Creating router");
+    log::info!("Creating routers");
+    log::info!("Creating faeries router");
+    let faery_router = Router::new()
+        .route("/", get(endpoints::faery::list_faeries).post(endpoints::faery::create_faery))
+        .route("/:faery_id", get(endpoints::faery::get_faery)
+            .put(endpoints::faery::update_faery)
+            .delete(endpoints::faery::delete_faery))
+        .layer(Extension(faery_repository));
+
+    log::info!("Creating user router");
+    let auth_router = Router::new()
+        .route("/player/:email/:token", get(endpoints::auth::authenticate_user))
+        .route("/player/:email", get(endpoints::auth::send_login_email))
+        .layer(Extension(email_repository))
+        .layer(Extension(player_repository));
+
+    log::info!("Creating main api router");
+    let api_router = Router::new()
+        .route("/hello", get(hello_world))
+        .nest("/faeries", faery_router)
+        .nest("/auth", auth_router);
+
+    log::info!("Creating main application router");
     let router = Router::new()
-        .route("/api/hello", get(hello_world))
-        .route("/api/faeries", get(endpoints::list_faeries).post(endpoints::create_faery))
-        .route("/api/faeries/:faery_id", get(endpoints::get_faery).put(endpoints::update_faery).delete(endpoints::delete_faery))
-        // .route("/api/test_email", get(send_test_email))
+        .nest("/api", api_router)
         .layer(ServiceBuilder::new().layer(cors))
+        // TODO: remove this and replace with user state / session info from JWT
         .with_state(state)
         .nest_service("/", ServeDir::new("dross-manager-frontend/dist"));
 
@@ -86,14 +104,6 @@ async fn axum(
         router
     })
 }
-
-// async fn send_test_email(State(state): State<Arc<DrossManagerState>>) -> Response {
-//     let res = state.clone().email_repository.send_email("Test", "tsalaroth@gmail.com", "This is a test email").await;
-//     match res {
-//         Ok(_) => (StatusCode::OK, Json("Sent")).into_response(),
-//         Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, Json(err)).into_response()
-//     }
-// }
 
 #[shuttle_runtime::async_trait]
 impl shuttle_runtime::Service for DrossManagerService {

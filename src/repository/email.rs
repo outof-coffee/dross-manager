@@ -45,8 +45,8 @@ impl EmailRepository {
     }
 
     pub async fn send_auth_token(&self, email: &str, token: &str) -> RepositoryResult<()> {
-        // TODO: produce a link back to the app or send it to this method
-        let message = format!("Your auth token is: {}", token);
+        // TODO: Send an email with a button
+        let message = format!("Your auth link is: https://dross-manager.shuttleapp.rs/api/auth/player/{}/{}", email, token);
         self.send_email("Fe-Vault Login Token", email, &message).await
     }
 

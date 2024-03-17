@@ -15,6 +15,7 @@ use axum::extract::rejection::JsonRejection;
 pub enum RepositoryError {
     NotFound,
     AlreadyExists,
+    ExpiredGuard,
     InvalidModel,
     MigrationFailed(Version, Version),
     Other,
