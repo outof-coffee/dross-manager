@@ -21,6 +21,7 @@ pub struct DrossManagerService {
     router: Router
 }
 pub struct DrossManagerState {
+    pub session_repository: Arc<SessionRepository>,
     pub jwt_key_pair: JWTKeyPair
 }
 
@@ -54,6 +55,8 @@ async fn axum(
     let email_repository = Arc::new(EmailRepository::new(mailgun_user, mailgun_token, mailgun_domain));
 
     let state = Arc::new(DrossManagerState {
+        // TODO: move to middleware manager
+        session_repository: Arc::new(SessionRepository::new(db.clone())),
         jwt_key_pair: JWTKeyPair {
             public_key: store.get("ACCESS_TOKEN_PUBLIC_KEY").unwrap(),
             private_key: store.get("ACCESS_TOKEN_PRIVATE_KEY").unwrap()

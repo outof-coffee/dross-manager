@@ -32,7 +32,6 @@ pub mod auth {
         pub nbf: i64,
     }
 
-
     #[derive(Debug, Serialize, Deserialize, Clone)]
     pub struct JWTAuthMiddleware {
         pub user: PlayerData,
@@ -136,7 +135,7 @@ pub mod auth {
                 return Err((StatusCode::UNAUTHORIZED, Json(error_response)));
             }
         };
-        let _access_token_uuid = uuid::Uuid::parse_str(&access_token_details.token_uuid.to_string())
+        let _access_token_uuid = Uuid::parse_str(&access_token_details.token_uuid.to_string())
             .map_err(|_| {
                 let error_response = JWTErrorResponse {
                     status: "fail",
@@ -145,6 +144,7 @@ pub mod auth {
                 (StatusCode::UNAUTHORIZED, Json(error_response))
             })?;
 
+        // let session =
         // let redis_token_user_id = redis_client
         //     .get::<_, String>(access_token_uuid.clone().to_string())
         //     .await

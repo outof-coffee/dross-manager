@@ -11,6 +11,16 @@ pub struct Session {
     pub expires_in: i64,
 }
 
+impl Session {
+    pub fn from_response(row: &libsql::Row) -> Session {
+        Session {
+            user_id: row.get(1).unwrap(),
+            session_token: row.get(2).unwrap(),
+            expires_in: row.get(3).unwrap(),
+        }
+    }
+}
+
 pub struct SessionRepository {
     pub db: Arc<Mutex<Connection>>,
 }
@@ -86,6 +96,26 @@ impl Repository for SessionRepository {
 
 #[allow(dead_code)]
 impl SessionRepository {
+
+    pub fn new(db: Arc<Mutex<Connection>>) -> SessionRepository {
+        SessionRepository {
+            db,
+        }
+    }
+
+    pub async fn get_by_token(&self, session_token: &str) -> RepositoryResult<Session> {
+        let db = self.db.lock().await;
+        let mut stmt = db.prepare("SELECT * FROM sessions WHERE session_token = ?1").await.unwrap();
+        let mut res = stmt.query(params![session_token]).await.unwrap();
+        match res.next()? {
+            Some(row) => {
+                let session = Session::from_response(&row);
+                Ok(session)
+            },
+            None => Err(RepositoryError::NotFound),
+        }
+    }
+
     pub async fn clean_up_expired(&self) -> RepositoryResult<()> {
         let db = self.db.lock().await;
         let now = chrono::Utc::now().timestamp_millis();
